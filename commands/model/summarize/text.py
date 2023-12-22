@@ -1,5 +1,5 @@
 from systems.commands.index import Command
-from utility.summary import TextSummarizer
+from systems.summary.text import TextSummarizer
 
 
 class Text(Command('model.summarize.text')):
