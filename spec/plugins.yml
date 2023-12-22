@@ -1,0 +1,156 @@
+plugin_mixins:
+    llama2_summary:
+        class: Llama2SummaryMixin
+    mixtral_summary:
+        class: MixtralSummaryMixin
+
+plugin:
+    file_parser:
+        base: base
+        interface:
+            parse:
+                params:
+                    file_path: str
+                returns: str
+        providers:
+            txt:
+            binary:
+            docx:
+                base: binary
+            pdf:
+                base: binary
+
+    qdrant_collection:
+        base: base
+        interface:
+            exists:
+                params:
+                    ids: list
+                returns: bool
+            get:
+                params:
+                    ids: list
+                    options: dict
+                returns: list
+            store:
+                params:
+                    fields: list
+                returns: bool
+            remove:
+                params:
+                    ids: list
+            search:
+                params:
+                    embeddings: list
+                    limit: int
+                    fields: list
+                returns: list
+        option:
+            shards:
+                type: int
+                help: "Data collection shards"
+                default: 1
+        providers: {}
+
+    sentence_parser:
+        base: base
+        interface:
+            get_max_sentence_length:
+                returns: str
+            split:
+                params:
+                    text: str
+                returns: list
+        option:
+            device:
+                type: str
+                help: "Device to run setence parsing process"
+                default: null
+            max_sentence_length:
+                type: int
+                help: "Maximum length of parsed sentence"
+                default: 3500
+        providers:
+            spacy:
+                option:
+                    model:
+                        type: str
+                        help: "Model name"
+            core_en_web:
+                base: spacy
+                option:
+                    model:
+                        type: str
+                        help: "SpaCY model name"
+                        default: "en_core_web_lg"
+
+    encoder:
+        base: base
+        interface:
+            get_dimension:
+                returns: int
+            encode:
+                params:
+                    sentences: list
+                returns: list
+        option:
+            device:
+                type: str
+                help: "Device to run encoding process"
+                default: "cuda:0"
+        providers:
+            transformer:
+            di:
+            mpnet:
+                base: transformer
+            mpnet_di:
+                base: di
+
+    summarizer:
+        base: base
+        interface:
+            get_chunk_length:
+                returns: int
+            get_token_count:
+                params:
+                    text: str
+                returns: int
+            summarize:
+                params:
+                    text: str
+                returns: str
+        option:
+            device:
+                type: str
+                help: "Device to run summarization process"
+                default: "cuda:0"
+        providers:
+            transformer:
+
+            llama2:
+                base: transformer
+                mixins: [llama2_summary]
+            llama2_7b:
+                base: llama2
+            llama2_13b:
+                base: llama2
+
+            di:
+                base: transformer
+            llama2_di:
+                base: di
+                mixins: [llama2_summary]
+            llama2_di_7b:
+                base: llama2_di
+            llama2_di_13b:
+                base: llama2_di
+            llama2_di_70b:
+                base: llama2_di
+
+            mixtral_di:
+                base: di
+                mixins: [mixtral_summary]
+            mixtral_di_7bx8:
+                base: mixtral_di
+
+            vertex_ai:

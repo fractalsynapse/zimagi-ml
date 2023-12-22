@@ -1,0 +1,137 @@
+command_mixins:
+    ml:
+        class: MLCommandMixin
+        parameters:
+            instruction:
+                parser: variable
+                type: str
+                optional: false
+                help: "Prompt instruction"
+                value_label: PROMPT
+                tags: [ml]
+            persona:
+                parser: variable
+                type: str
+                optional: "--persona"
+                default: |
+                    You provide precise and accurate summaries of the provided text using only the provided text.
+                    You do not include partial statements and you do not repeat yourself.
+                    You keep generated summary to less than 500 words.
+                help: "Persona for system prompt"
+                value_label: TEXT
+                tags: [ml]
+            temperature:
+                parser: variable
+                type: float
+                optional: "--temp"
+                default: 0.1
+                help: "Model temperature"
+                value_label: FLOAT
+                tags: [ml]
+            top_p:
+                parser: variable
+                type: float
+                optional: "--topp"
+                default: 0.9
+                help: "Model top-P"
+                value_label: FLOAT
+                tags: [ml]
+            repetition_penalty:
+                parser: variable
+                type: float
+                optional: "--repetition-penalty"
+                default: 0.1
+                help: "Model repetition penalty"
+                value_label: FLOAT
+                tags: [ml]
+            max_chunks:
+                parser: variable
+                type: int
+                optional: "--max-chunks"
+                default: 5
+                help: "Model summarization max chunks"
+                value_label: INT
+                tags: [ml]
+
+    qdrant:
+        class: QdrantCommandMixin
+        mixins: [ml]
+
+command_base:
+    model_admin:
+        server_enabled: true
+        groups_allowed: [ml-admin]
+
+    model_user:
+        server_enabled: true
+        groups_allowed: [ml-user]
+
+command:
+    model:
+        sentences:
+            base: model_user
+            parameters:
+                text:
+                    parser: variable
+                    type: str
+                    optional: false
+                    help: "Text to parse sentences"
+                    value_label: TEXT
+                    tags: [model]
+            parse:
+                - text
+
+        embedding:
+            base: model_user
+            parameters:
+                sentences:
+                    parser: variables
+                    type: str
+                    optional: false
+                    help: "Text sentences to generate embeddings"
+                    value_label: TEXT
+                    tags: [model]
+            parse:
+                - sentences
+
+        summary:
+            base: model_user
+            parameters:
+                text:
+                    parser: variable
+                    type: str
+                    optional: false
+                    help: "Text to summarize"
+                    value_label: TEXT
+                    tags: [model]
+                model_config:
+                    parser: variable
+                    type: str
+                    optional: "--config"
+                    help: "JSON encoded summarization model configurations"
+                    value_label: TEXT
+                    tags: [model]
+            parse:
+                - text
+                - model_config
+
+        summarize:
+            text:
+                base: model_user
+                mixins: [ml]
+                parameters:
+                    text:
+                        parser: variable
+                        type: str
+                        optional: false
+                        help: "Text to summarize"
+                        value_label: TEXT
+                        tags: [ml]
+                parse:
+                    - instruction
+                    - text
+                    - persona
+                    - temperature
+                    - top_p
+                    - repetition_penalty
+                    - max_chunks

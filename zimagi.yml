@@ -1,0 +1,10 @@
+name: ml
+
+version: 0.0.1
+compatibility: ">=0.13.0,<0.14"
+
+scripts: scripts/install.sh
+requirements: requirements.txt
+
+env:
+  OMP_THREAD_LIMIT: 20

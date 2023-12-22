@@ -1,0 +1,12 @@
+command:
+    agent:
+        model:
+            sentence_parser:
+                base: agent
+                mixins: [ml]
+            encoder:
+                base: agent
+                mixins: [ml]
+            summarizer:
+                base: agent
+                mixins: [ml]

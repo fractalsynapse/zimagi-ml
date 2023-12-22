@@ -1,0 +1,11 @@
+qdrant-client==1.4.0
+
+beautifulsoup4==4.12.2
+docx2python==2.7.3
+pytesseract==0.3.10
+pdf2image==1.16.3
+
+scikit-learn==1.2.2
+transformers==4.30.2
+sentence-transformers==2.2.2
+google-cloud-aiplatform==1.30.1
