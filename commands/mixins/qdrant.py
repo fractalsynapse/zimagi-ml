@@ -11,6 +11,17 @@ class QdrantCommandMixin(CommandMixin('qdrant')):
     def qdrant(self, name, **options):
         return self.get_provider('qdrant_collection', name, **options)
 
+    def get_qdrant_collections(self, names = None, **options):
+        if names:
+            return [
+                self.qdrant(name, **options)
+                for name in ensure_list(names)
+            ]
+        return [
+            self.qdrant(name, **options)
+            for name in list(self.manager.index.get_plugin_providers('qdrant_collection').keys())
+        ]
+
 
     def get_embeddings(self, collection, *ids):
         qdrant = self.qdrant(collection)

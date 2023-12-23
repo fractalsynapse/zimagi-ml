@@ -56,6 +56,21 @@ command_mixins:
     qdrant:
         class: QdrantCommandMixin
         mixins: [ml]
+        parameters:
+            collection_name:
+                parser: variable
+                type: str
+                optional: true
+                help: "Qdrant Collection name"
+                value_label: NAME
+                tags: [qdrant]
+            snapshot_name:
+                parser: variable
+                type: str
+                optional: true
+                help: "Qdrant Collection snapshot name"
+                value_label: NAME
+                tags: [qdrant]
 
 command_base:
     model_admin:
@@ -135,3 +150,44 @@ command:
                     - top_p
                     - repetition_penalty
                     - max_chunks
+    qdrant:
+        list:
+            base: model_admin
+            mixins: [qdrant]
+            parse: collection_name
+
+        snapshot:
+            base: model_admin
+            mixins: [qdrant]
+            parse: collection_name
+
+        remove:
+            base: model_admin
+            mixins: [qdrant]
+            confirm: true
+            parse:
+                collection_name: false
+                snapshot_name: false
+
+        clean:
+            base: model_admin
+            mixins: [qdrant]
+            parameters:
+                keep_num:
+                    parser: variable
+                    type: int
+                    optional: "--keep"
+                    default: 3
+                    help: "Number of most recent snapshots to keep"
+                    value_label: INT
+                    tags: [qdrant]
+            parse:
+                - collection_name
+                - keep_num
+
+        restore:
+            base: model_admin
+            mixins: [qdrant]
+            parse:
+                - collection_name
+                - snapshot_name

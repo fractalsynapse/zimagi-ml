@@ -2,10 +2,10 @@ from django.conf import settings
 from qdrant_client import QdrantClient, models
 
 from systems.plugins.index import BasePlugin
-from utility.data import get_identifier, get_uuid, ensure_list, chunk_list
-from utility.display import silence
+from utility.data import Collection, get_identifier, get_uuid, ensure_list, chunk_list
 
 import billiard as multiprocessing
+import warnings
 
 
 class BaseProvider(BasePlugin('qdrant_collection')):
@@ -32,28 +32,29 @@ class BaseProvider(BasePlugin('qdrant_collection')):
 
     @classmethod
     def initialize(cls, instance):
-        if not getattr(cls, '_client', None):
-            cls._client = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if not getattr(cls, '_client', None):
+                cls._client = {}
 
-        if instance.identifier not in cls._client:
-            def init_client():
-                cls._client[instance.identifier] = QdrantClient(
-                    host = settings.QDRANT_HOST,
-                    port = settings.QDRANT_PORT,
-                    https = settings.QDRANT_HTTPS,
-                    api_key = settings.QDRANT_ACCESS_KEY,
-                    timeout = 300
-                )
+            if instance.identifier not in cls._client:
+                def init_client():
+                    cls._client[instance.identifier] = QdrantClient(
+                        host = settings.QDRANT_HOST,
+                        port = settings.QDRANT_PORT,
+                        https = settings.QDRANT_HTTPS,
+                        api_key = settings.QDRANT_ACCESS_KEY,
+                        timeout = 300
+                    )
 
-            if instance.command.debug:
-                init_client()
-            else:
-                with silence():
+                if instance.command.debug:
                     init_client()
-            try:
-                instance.client.get_collection(instance.name)
-            except Exception:
-                instance._create_collection()
+                else:
+                    init_client()
+                try:
+                    instance.client.get_collection(instance.name)
+                except Exception:
+                    instance._create_collection()
 
 
     @property
@@ -207,3 +208,60 @@ class BaseProvider(BasePlugin('qdrant_collection')):
                 requests = search_queries
             ))
         return search_results
+
+
+    def get_info(self):
+        collection = self.client.get_collection(self.name)
+
+        def get_field_info(field):
+            return {
+                'type': field.data_type,
+                'points': field.points
+            }
+
+        return Collection(
+            status = collection.status.value,
+            optimizer = collection.optimizer_status,
+            vector_count = collection.vectors_count,
+            indexed_vector_count = collection.indexed_vectors_count,
+            point_count = collection.points_count,
+            segment_count = collection.segments_count,
+            schema = {
+                key: get_field_info(value)
+                for key, value in collection.payload_schema.items()
+            }
+        )
+
+
+    def list_snapshots(self):
+        return self.client.list_snapshots(self.name)
+
+    def create_snapshot(self):
+        return self.client.create_snapshot(self.name, wait = True)
+
+    def delete_snapshot(self, name):
+        return self.client.delete_snapshot(self.name, name, wait = True)
+
+    def clean_snapshots(self, keep_num = 3):
+        success = True
+
+        for index, snapshot in enumerate(self.list_snapshots()):
+            if index >= keep_num:
+                self.command.notice("Removing snapshot: {}".format(snapshot.name))
+                if not self.delete_snapshot(snapshot.name):
+                    success = False
+
+        return success
+
+    def restore_snapshot(self, name = None, priority = 'snapshot'):
+        if not name:
+            snapshots = self.list_snapshots()
+            if not snapshots:
+                return False
+            name = snapshots[0].name
+
+        return self.client.recover_snapshot(self.name,
+            "file:///qdrant/snapshots/{}/{}".format(self.name, name),
+            priority = priority,
+            wait = True
+        )
