@@ -5,15 +5,20 @@ service:
 
 services:
     qdrant:
-        image: qdrant/qdrant:v1.4.1
+        image: qdrant/qdrant:v1.7.3
         memory: "@ZIMAGI_QDRANT_SERVICE_MEMORY<< None >>"
         restart_policy:
             Name: always
         environment:
-            QDRANT__SERVICE__API_KEY: "@ZIMAGI_QDRANT_ACCESS_KEY"
             QDRANT__LOG_LEVEL: INFO
+            QDRANT__SERVICE__API_KEY: "@ZIMAGI_QDRANT_ACCESS_KEY"
+            QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/snapshots
+            QDRANT__STORAGE__TEMP_PATH: /qdrant/snapshots/tmp
         volumes:
             qdrant:
                 bind: /qdrant/storage
+                mode: rw
+            qdrant_snapshots:
+                bind: /qdrant/snapshots
                 mode: rw
         ports: 6333/tcp

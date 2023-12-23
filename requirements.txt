@@ -1,4 +1,4 @@
-qdrant-client==1.4.0
+qdrant-client==1.7.0
 
 beautifulsoup4==4.12.2
 docx2python==2.7.3
