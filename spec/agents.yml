@@ -1,5 +1,9 @@
 command:
     agent:
+        qdrant:
+            base: agent
+            mixins: [qdrant]
+
         model:
             sentence_parser:
                 base: agent
