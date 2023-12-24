@@ -243,6 +243,7 @@ class BaseProvider(BasePlugin('qdrant_collection')):
         return self.client.delete_snapshot(self.name, name, wait = True)
 
     def clean_snapshots(self, keep_num = 3):
+        keep_num = int(keep_num)
         success = True
 
         for index, snapshot in enumerate(self.list_snapshots()):
