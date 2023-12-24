@@ -5,9 +5,18 @@ from settings.config import Config
 #
 # Model cache paths
 #
-settings.PROJECT_PATH_MAP['st_model_cache'] = 'st_models'
-settings.PROJECT_PATH_MAP['tr_model_cache'] = 'tr_models'
-settings.PROJECT_PATH_MAP['hf_cache'] = 'hf_cache'
+settings.PROJECT_PATH_MAP['st_model_cache'] = {
+    'directory': 'st_models',
+    'backup': False
+}
+settings.PROJECT_PATH_MAP['tr_model_cache'] = {
+    'directory': 'tr_models',
+    'backup': False
+}
+settings.PROJECT_PATH_MAP['hf_cache'] = {
+    'directory': 'hf_cache',
+    'backup': False
+}
 
 #
 # Qdrant Database
