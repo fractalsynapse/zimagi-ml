@@ -5,7 +5,8 @@ class Qdrant(Agent('qdrant')):
 
     processes = (
         'qdrant_backup',
-        'qdrant_clean'
+        'qdrant_clean',
+        'qdrant_restore'
     )
 
     def qdrant_backup(self):
@@ -15,3 +16,8 @@ class Qdrant(Agent('qdrant')):
     def qdrant_clean(self):
         for package in self.listen('core:db:clean', state_key = 'qdrant'):
             self.clean_snapshots(keep_num = package.message)
+
+    def qdrant_restore(self):
+        for package in self.listen('core:db:restore:init', state_key = 'qdrant'):
+            if package.message.get('latest', False):
+                self.restore_snapshot()
