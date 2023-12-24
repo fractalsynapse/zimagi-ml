@@ -1,7 +1,7 @@
 from django.conf import settings
 
 from systems.models.index import Model
-from .data import Collection
+from utility.data import Collection
 
 import time
 
