@@ -44,7 +44,7 @@ class BaseProvider(BasePlugin('qdrant_collection')):
                         port = settings.QDRANT_PORT,
                         https = settings.QDRANT_HTTPS,
                         api_key = settings.QDRANT_ACCESS_KEY,
-                        timeout = 300
+                        timeout = 14400
                     )
 
                 if instance.command.debug:
