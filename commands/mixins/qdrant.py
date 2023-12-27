@@ -1,9 +1,5 @@
 from systems.commands.index import CommandMixin
 from utility.data import Collection, ensure_list
-from utility.web import WebParser
-from utility.temp import temp_dir
-
-import base64
 
 
 class QdrantCommandMixin(CommandMixin('qdrant')):
@@ -112,27 +108,3 @@ class QdrantCommandMixin(CommandMixin('qdrant')):
             )
             if results.aborted:
                 self.error('Qdrant snapshot restoration failed')
-
-
-    def parse_file_text(self, portal, api_doc_type, file_id):
-        text = ''
-        with temp_dir() as temp:
-            file = portal.retrieve(api_doc_type, file_id)
-            file_type = file['file'].split('.')[-1].lower()
-            file_path = temp.save(base64.b64decode(file['content']), binary = True)
-            try:
-                parser = self.manager.get_provider('file_parser', file_type)
-                file_text = parser.parse(file_path)
-                if file_text:
-                    text = file_text
-
-            except ProviderError as e:
-                pass
-        return text
-
-    def parse_web_text(self, webpage_url):
-        text = ''
-        parser = WebParser(webpage_url)
-        if parser.text:
-            text = parser.text
-        return text
