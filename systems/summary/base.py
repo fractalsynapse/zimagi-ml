@@ -86,7 +86,8 @@ class BaseModelSummarizer(object):
         if include_files and self.section_facade and self.embedding_collection:
             section_index = {}
             embeddings = self.command.generate_text_embeddings(prompt)
-            document_rankings = self.command.search_embeddings(self.embedding_collection, embeddings,
+            document_rankings = self.command.search_embeddings(self.embedding_collection,
+                embeddings.embeddings,
                 limit = sentence_limit,
                 fields = [ 'section_id' ],
                 filter_field = self.embedding_id_field,

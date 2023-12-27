@@ -6,5 +6,10 @@ compatibility: ">=0.13.0,<0.14"
 scripts: scripts/install.sh
 requirements: requirements.txt
 
+modules:
+    - provider: github
+      remote: fractalsynapse/zimagi-qdrant
+      reference: main
+
 env:
   OMP_THREAD_LIMIT: 20
