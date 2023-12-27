@@ -67,6 +67,7 @@ command:
     model:
         sentences:
             base: model_user
+            worker_type: ml-sentences
             parameters:
                 text:
                     parser: variable
@@ -80,6 +81,7 @@ command:
 
         embedding:
             base: model_user
+            worker_type: ml-embedding
             parameters:
                 sentences:
                     parser: variables
@@ -93,6 +95,7 @@ command:
 
         summary:
             base: model_user
+            worker_type: ml-summary
             parameters:
                 text:
                     parser: variable
@@ -116,6 +119,7 @@ command:
             text:
                 base: model_user
                 mixins: [ml]
+                worker_type: ml-summary
                 parameters:
                     text:
                         parser: variable

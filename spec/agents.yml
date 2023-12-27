@@ -4,9 +4,14 @@ command:
             sentence_parser:
                 base: agent
                 mixins: [ml]
+                worker_type: ml-sentences
+
             encoder:
                 base: agent
                 mixins: [ml]
+                worker_type: ml-embedding
+
             summarizer:
                 base: agent
                 mixins: [ml]
+                worker_type: ml-summary
