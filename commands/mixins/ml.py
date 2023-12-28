@@ -2,6 +2,7 @@ from django.conf import settings
 
 from systems.commands.index import CommandMixin
 from utility.data import Collection
+from utility.web import WebParser
 
 import billiard as multiprocessing
 import re
@@ -202,3 +203,11 @@ class MLCommandMixin(CommandMixin('ml')):
             sections.append(section.strip())
 
         return sections
+
+
+    def parse_web_text(self, webpage_url):
+        text = ''
+        parser = WebParser(webpage_url)
+        if parser.text:
+            text = parser.text
+        return text
