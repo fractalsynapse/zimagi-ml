@@ -53,7 +53,7 @@ class BaseModelSummarizer(object):
         return chunks
 
 
-    def _get_chunks(self, prompt, max_chunks, include_files = True, sentence_limit = 500):
+    def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 500):
         max_token_count = self.summarizer.get_chunk_length()
         prompt_token_count = self.summarizer.get_token_count(prompt)
         token_count = prompt_token_count
@@ -61,6 +61,9 @@ class BaseModelSummarizer(object):
         sections = []
         chunks = [""]
         chunk_index = 0
+
+        if not search_prompt:
+            search_prompt = prompt
 
         # Get text chunks
         if self.text_facade and self.text_field:
@@ -85,7 +88,7 @@ class BaseModelSummarizer(object):
         # Get document sections
         if include_files and self.section_facade and self.embedding_collection:
             section_index = {}
-            embeddings = self.command.generate_text_embeddings(prompt)
+            embeddings = self.command.generate_text_embeddings(search_prompt)
             document_rankings = self.command.search_embeddings(self.embedding_collection,
                 embeddings.embeddings,
                 limit = sentence_limit,
@@ -98,11 +101,12 @@ class BaseModelSummarizer(object):
                     sentence = sentence_info.payload['sentence']
                     if 'section_id' in sentence_info.payload and sentence_info.payload['section_id'] not in section_index:
                         section = self.section_facade.retrieve_by_id(sentence_info.payload['section_id'])
-                        sections.append({
-                            'text': section.text,
-                            'score': sentence_info.score
-                        })
-                        section_index[section.id] = True
+                        if section:
+                            sections.append({
+                                'text': section.text,
+                                'score': sentence_info.score
+                            })
+                            section_index[section.id] = True
 
         # Get document chunks
         if sections:
@@ -122,7 +126,7 @@ class BaseModelSummarizer(object):
         return chunks
 
 
-    def generate(self, prompt, max_chunks = 2, include_files = True, sentence_limit = 500, **config):
+    def generate(self, prompt, search_prompt = None, max_chunks = 2, include_files = True, sentence_limit = 500, **config):
 
         def generate_summary(info):
             _sub_prompt = "Extract and format the relevant information from the provided text for the following request: {}".format(prompt)
@@ -157,6 +161,7 @@ Response Tokens: {}
                 _chunks = self._get_text_chunks(text, prompt, max_chunks)
             else:
                 _chunks = self._get_chunks(prompt, max_chunks,
+                    search_prompt = search_prompt,
                     include_files = include_files,
                     sentence_limit = sentence_limit
                 )
