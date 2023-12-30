@@ -15,9 +15,9 @@ command_mixins:
                 type: str
                 optional: "--persona"
                 default: |
-                    You provide precise and accurate summaries of the provided text using only the provided text.
-                    You do not include partial statements and you do not repeat yourself.
-                    You keep generated summary to less than 500 words.
+                    Provide precise and accurate summaries of the provided text using only the provided text.
+                    Do not include partial statements and always write cohesive sentences.
+                    Do not generate sentence fragments or incomplete words.
                 help: "Persona for system prompt"
                 value_label: TEXT
                 tags: [ml]
