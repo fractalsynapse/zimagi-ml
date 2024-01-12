@@ -26,7 +26,8 @@ class Provider(BaseProvider('summarizer', 'llama2')):
     def summarize(self, text, **config):
         prompt = self._get_prompt(text,
             prompt = config.get('prompt', ''),
-            persona = config.get('persona', '')
+            persona = config.get('persona', ''),
+            output_format = config.get('format', '')
         )
         results = self.pipeline(
             prompt,

@@ -38,7 +38,7 @@ class TextSummarizer(object):
         return chunks
 
 
-    def generate(self, prompt, **config):
+    def generate(self, prompt, output_format = '', **config):
         max_chunks = config.pop('max_chunks', 0)
 
         def generate_summary(info):
@@ -94,7 +94,11 @@ Response Tokens: {}
                     _response_tokens += _final_response_tokens
                 else:
                     _request_tokens += self.summarizer.get_token_count(_chunks[0]['text'])
-                    _summary_text = self.command.generate_summary(_chunks[0]['text'], prompt = prompt, **config)
+                    _summary_text = self.command.generate_summary(_chunks[0]['text'],
+                        prompt = prompt,
+                        format = output_format,
+                        **config
+                    )
                     _response_tokens += self.summarizer.get_token_count(_summary_text)
 
                     if self.command.verbosity == 3:

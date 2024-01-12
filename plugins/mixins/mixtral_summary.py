@@ -3,7 +3,7 @@ from systems.plugins.index import ProviderMixin
 
 class MixtralSummaryMixin(ProviderMixin('mixtral_summary')):
 
-    def _get_prompt(self, text, prompt = '', persona = ''):
+    def _get_prompt(self, text, prompt = '', persona = '', output_format = ''):
         return """
 <s>[INST] <<SYS>>
 {persona}
@@ -18,11 +18,14 @@ I will refer to the provided text when following instructions
 </s>
 <s>[INST]
 {instruction}
+
+{output_format}
 [/INST]
         """.format(
             persona = persona.strip(),
             instruction = prompt.strip(),
-            text = text.strip()
+            text = text.strip(),
+            output_format = output_format.strip()
         )
 
     def _parse_summary_response(self, summary):

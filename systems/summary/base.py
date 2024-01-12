@@ -126,7 +126,7 @@ class BaseModelSummarizer(object):
         return chunks
 
 
-    def generate(self, prompt, search_prompt = None, max_chunks = 2, include_files = True, sentence_limit = 500, **config):
+    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 2, include_files = True, sentence_limit = 500, **config):
 
         def generate_summary(info):
             _sub_prompt = "Extract and format the relevant information from the provided text for the following request: {}".format(prompt)
@@ -186,7 +186,11 @@ Response Tokens: {}
                     _response_tokens += _final_response_tokens
                 else:
                     _request_tokens += self.summarizer.get_token_count(_chunks[0]['text'])
-                    _summary_text = self.command.generate_summary(_chunks[0]['text'], prompt = prompt, **config)
+                    _summary_text = self.command.generate_summary(_chunks[0]['text'],
+                        prompt = prompt,
+                        format = output_format,
+                        **config
+                    )
                     _response_tokens += self.summarizer.get_token_count(_summary_text)
 
                     if self.command.verbosity == 3:

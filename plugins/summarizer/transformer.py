@@ -59,7 +59,7 @@ class Provider(BaseProvider('summarizer', 'transformer')):
         return self._tokenizer[self.identifier]
 
     def get_token_count(self, text):
-        return len(self.tokenizer(text)['input_ids'])
+        return len(self.tokenizer(text)['input_ids']) if text.strip() else 0
 
     def get_chunk_length(self):
         return self.tokenizer.model_max_length
