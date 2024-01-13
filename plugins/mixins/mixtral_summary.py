@@ -19,6 +19,8 @@ I will refer to the provided text when following instructions
 <s>[INST]
 {instruction}
 
+Do not include external links.
+If adding information outside of the provided text, note that for the user so they can understand what is coming from the text and what is added from the training data.
 {output_format}
 [/INST]
         """.format(
