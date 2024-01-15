@@ -12,7 +12,7 @@ class BaseModelSummarizer(object):
         command,
         instance,
         text_facade = None,
-        section_facade = None
+        document_facade = None
     ):
         self.command = command
         self.instance = instance
@@ -23,7 +23,8 @@ class BaseModelSummarizer(object):
         self.text_id_field = self.instance.facade.pk
         self.text_field = None
 
-        self.section_facade = Model(section_facade).facade if section_facade else None
+        self.document_facade = Model(document_facade).facade if document_facade else None
+
         self.embedding_collection = None
         self.embedding_id_field = self.instance.facade.pk
 
@@ -53,12 +54,16 @@ class BaseModelSummarizer(object):
         return chunks
 
 
-    def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 500):
+    def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 20):
         max_token_count = self.summarizer.get_chunk_length()
         prompt_token_count = self.summarizer.get_token_count(prompt)
         token_count = prompt_token_count
 
-        sections = []
+        documents = {}
+        ranked_documents = {}
+        document_scores = {}
+        document_failed = {}
+
         chunks = [""]
         chunk_index = 0
 
@@ -85,45 +90,55 @@ class BaseModelSummarizer(object):
                             token_count += tokens
                             chunks[chunk_index] = "{}\n\n{}".format(chunks[chunk_index], section)
 
-        # Get document sections
-        if include_files and self.section_facade and self.embedding_collection:
-            section_index = {}
+        # Find documents
+        if include_files and self.document_facade and self.embedding_collection:
             embeddings = self.command.generate_text_embeddings(search_prompt)
             document_rankings = self.command.search_embeddings(self.embedding_collection,
                 embeddings.embeddings,
                 limit = sentence_limit,
-                fields = [ 'section_id' ],
+                fields = [ 'document_id' ],
                 filter_field = self.embedding_id_field,
                 filter_ids = self.instance.id
             )
             for index, ranking in enumerate(document_rankings):
                 for ranking_index, sentence_info in enumerate(ranking):
                     sentence = sentence_info.payload['sentence']
-                    if 'section_id' in sentence_info.payload and sentence_info.payload['section_id'] not in section_index:
-                        section = self.section_facade.retrieve_by_id(sentence_info.payload['section_id'])
-                        if section:
-                            sections.append({
-                                'text': section.text,
-                                'score': sentence_info.score
-                            })
-                            section_index[section.id] = True
+                    document_id = sentence_info.payload['document_id']
+
+                    if sentence_info.score >= 0.5:
+                        if document_id not in document_scores:
+                            if document_id not in document_failed:
+                                document = self.document_facade.retrieve_by_id(document_id)
+                                if document:
+                                    documents[document_id] = document
+                                    document_scores[document_id] = sentence_info.score
+                                else:
+                                    document_failed[document_id] = True
+                        else:
+                            document_scores[document_id] += sentence_info.score
 
         # Get document chunks
-        if sections:
-            for section in sorted(sections, key = lambda item: item['score'], reverse = True):
-                tokens = self.summarizer.get_token_count(section['text'])
-                if (token_count + tokens) > max_token_count:
-                    chunk_index += 1
-                    if not max_chunks or chunk_index < max_chunks:
-                        chunks.append(section['text'])
-                        token_count = tokens
-                    else:
-                        break
-                else:
-                    token_count += tokens
-                    chunks[chunk_index] = "{}  {}".format(chunks[chunk_index], section['text'])
+        if documents:
+            for document_id, score in sorted(document_scores.items(), key = lambda x:x[1], reverse = True):
+                document = documents[document_id]
+                if document.text.strip():
+                    for section_index, section in enumerate(self.command.parse_text_sections(document.text)):
+                        tokens = self.summarizer.get_token_count(section)
 
-        return chunks
+                        if (token_count + tokens) > max_token_count:
+                            chunk_index += 1
+                            if not max_chunks or chunk_index < max_chunks:
+                                chunks.append(section)
+                                token_count = tokens
+                            else:
+                                break
+                        else:
+                            token_count += tokens
+                            chunks[chunk_index] = "{}  {}".format(chunks[chunk_index], section)
+
+                    ranked_documents["{:07.3f}:{}".format(score, document.id)] = document
+
+        return chunks, ranked_documents
 
 
     def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 2, include_files = True, sentence_limit = 500, **config):
@@ -157,10 +172,12 @@ Response Tokens: {}
 
         def summarize(text = None):
             _summary_text = ''
+
             if text:
                 _chunks = self._get_text_chunks(text, prompt, max_chunks)
+                _documents = {}
             else:
-                _chunks = self._get_chunks(prompt, max_chunks,
+                _chunks, _documents = self._get_chunks(prompt, max_chunks,
                     search_prompt = search_prompt,
                     include_files = include_files,
                     sentence_limit = sentence_limit
@@ -179,11 +196,12 @@ Response Tokens: {}
                         _request_tokens += _chunk.result['request_tokens']
                         _response_tokens += _chunk.result['response_tokens']
 
-                    _summary_text, _final_request_tokens, _final_response_tokens = summarize(
+                    _summary_text, _final_request_tokens, _final_response_tokens, _chunk_documents = summarize(
                         "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
                     )
                     _request_tokens += _final_request_tokens
                     _response_tokens += _final_response_tokens
+                    _documents = { **_documents, **_chunk_documents }
                 else:
                     _request_tokens += self.summarizer.get_token_count(_chunks[0]['text'])
                     _summary_text = self.command.generate_summary(_chunks[0]['text'],
@@ -207,14 +225,15 @@ Response Tokens: {}
                             _response_tokens
                         ))
 
-            return _summary_text.strip(), _request_tokens, _response_tokens
+            return _summary_text.strip(), _request_tokens, _response_tokens, _documents
 
         start_time = time.time()
-        summary_text, request_tokens, response_tokens = summarize()
+        summary_text, request_tokens, response_tokens, documents = summarize()
         token_count = (request_tokens + response_tokens)
 
         return Collection(
             text = summary_text,
+            documents = documents,
             request_tokens = request_tokens,
             response_tokens = response_tokens,
             token_count = token_count,
