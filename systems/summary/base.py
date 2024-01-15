@@ -54,7 +54,7 @@ class BaseModelSummarizer(object):
         return chunks
 
 
-    def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 20):
+    def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 50):
         max_token_count = self.summarizer.get_chunk_length()
         prompt_token_count = self.summarizer.get_token_count(prompt)
         token_count = prompt_token_count
@@ -105,7 +105,7 @@ class BaseModelSummarizer(object):
                     sentence = sentence_info.payload['sentence']
                     document_id = sentence_info.payload['document_id']
 
-                    if sentence_info.score >= 0.5:
+                    if sentence_info.score >= 0.4:
                         if document_id not in document_scores:
                             if document_id not in document_failed:
                                 document = self.document_facade.retrieve_by_id(document_id)
@@ -141,7 +141,7 @@ class BaseModelSummarizer(object):
         return chunks, ranked_documents
 
 
-    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 2, include_files = True, sentence_limit = 500, **config):
+    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 2, include_files = True, sentence_limit = 50, **config):
 
         def generate_summary(info):
             _sub_prompt = "Extract and format the relevant information from the provided text for the following request: {}".format(prompt)
