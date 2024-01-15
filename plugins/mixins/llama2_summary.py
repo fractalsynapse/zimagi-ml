@@ -20,7 +20,6 @@ I will refer to the provided text when following instructions
 {instruction}
 
 Do not include external links.
-Ensure that the generated summary of the provided text is highly accurate.
 {output_format}
 [/INST]
         """.format(
