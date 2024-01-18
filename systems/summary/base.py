@@ -80,8 +80,8 @@ class BaseModelSummarizer(object):
                     for section_index, section in enumerate(self.command.parse_text_sections(text)):
                         tokens = self.summarizer.get_token_count(section)
                         if (token_count + tokens) > max_token_count:
-                            chunk_index += 1
                             if not max_chunks or chunk_index < max_chunks:
+                                chunk_index += 1
                                 chunks.append(section)
                                 token_count = (prompt_token_count + tokens)
                             else:
@@ -126,8 +126,8 @@ class BaseModelSummarizer(object):
                         tokens = self.summarizer.get_token_count(section)
 
                         if (token_count + tokens) > max_token_count:
-                            chunk_index += 1
                             if not max_chunks or chunk_index < max_chunks:
+                                chunk_index += 1
                                 chunks.append(section)
                                 token_count = tokens
                             else:
