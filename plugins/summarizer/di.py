@@ -53,7 +53,7 @@ class Provider(BaseProvider('summarizer', 'di')):
         )
         response_data = load_json(response.text)
 
-        if response.status_code == 200 and response_data['inference_status']['status'] == 'succeeded':
+        if response.status_code == 200 and response_data['inference_status'].get('tokens_generated', None):
             return response_data['results']
         else:
             raise DeepInfraRequestError("DeepInfra inference request failed with code {}: {}".format(
