@@ -28,6 +28,8 @@ class MLCommandMixin(CommandMixin('ml')):
         return provider
 
     def parse_sentences(self, text):
+        if not text:
+            return []
         return self.submit('agent:model:sentence_parser', text)
 
 
@@ -46,6 +48,8 @@ class MLCommandMixin(CommandMixin('ml')):
         return provider
 
     def generate_embeddings(self, sentences):
+        if not sentences:
+            return []
         return self.submit('agent:model:embedding', sentences)
 
     def generate_text_embeddings(self, text):
@@ -77,6 +81,8 @@ class MLCommandMixin(CommandMixin('ml')):
         return provider
 
     def generate_summary(self, text, **config):
+        if not text:
+            return None
         return self.submit('agent:model:summary', {
                 'text': text,
                 'config': config
