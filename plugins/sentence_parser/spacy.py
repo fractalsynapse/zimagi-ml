@@ -47,18 +47,15 @@ class Provider(BaseProvider('sentence_parser', 'spacy')):
                 for sentence in doc.sents:
                     if sentence[0].is_title:
                         noun_count = 0
-                        pronoun_count = 0
                         verb_count = 0
 
                         for token in sentence:
                             if token.pos_ in [ 'NOUN', 'PROPN' ]:
                                 noun_count += 1
-                            elif token.pos_ in [ 'PRON' ]:
-                                pronoun_count += 1
                             elif token.pos_ == 'VERB':
                                 verb_count += 1
 
-                        if noun_count > 0 or verb_count > 0 or pronoun_count > 0:
+                        if noun_count > 0 and verb_count > 0:
                             sentence = re.sub(r'\n+', ' ', str(sentence)).strip()
                             if len(sentence) < self.get_max_sentence_length():
                                 sentences.append(sentence)
