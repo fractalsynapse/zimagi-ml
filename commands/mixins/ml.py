@@ -56,7 +56,7 @@ class MLCommandMixin(CommandMixin('ml')):
         text_data = Collection(sentences = [], embeddings = [])
         has_data = False
 
-        for section in self.parse_text_sections(text):
+        for section in self.parse_text_sections(text.encode('ascii', 'ignore').decode().replace("\x00", '')):
             sentences = self.parse_sentences(section)
             if sentences:
                 text_data.sentences.extend(sentences)
