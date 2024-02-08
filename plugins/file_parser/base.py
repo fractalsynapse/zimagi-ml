@@ -16,7 +16,7 @@ class BaseProvider(BasePlugin('file_parser')):
     try:
       return self._clean_content(self.parse_file(file_path))
     except Exception as e:
-      return ""
+      return ''
 
   def parse_file(self, file_path):
     return self.parse_content(load_file(file_path, self.check_binary()))
@@ -27,5 +27,5 @@ class BaseProvider(BasePlugin('file_parser')):
 
 
   def _clean_content(self, content):
-    soup = BeautifulSoup(content, features = 'html.parser')
-    return re.sub(r'\n{3,}', '\n\n', soup.get_text()).encode('ascii', errors = 'ignore').decode().strip()
+    soup = BeautifulSoup(content.encode('ascii', 'ignore').decode().replace("\x00", ''), features = 'html.parser')
+    return re.sub(r'\n{3,}', '\n\n', soup.get_text()).strip()
