@@ -53,17 +53,17 @@ class MLCommandMixin(CommandMixin('ml')):
         return self.submit('agent:model:embedding', sentences)
 
     def generate_text_embeddings(self, text):
-        sentences = self.parse_sentences(text)
+        text_data = Collection(sentences = [], embeddings = [])
+        has_data = False
 
-        if sentences:
-            embeddings = self.generate_embeddings(sentences)
-        else:
-            return None
+        for section in self.parse_text_sections(text):
+            sentences = self.parse_sentences(section)
+            if sentences:
+                text_data.sentences.extend(sentences)
+                text_data.embeddings.extend(self.generate_embeddings(sentences))
+            has_data = True
 
-        return Collection(
-            sentences = sentences,
-            embeddings = embeddings
-        )
+        return text_data if has_data else None
 
 
     def get_summarizer(self, **options):
@@ -172,41 +172,21 @@ class MLCommandMixin(CommandMixin('ml')):
         return self.run_exclusive(name, update)
 
 
-    def parse_text_sections(self, text):
-        index = {}
+    def parse_text_sections(self, text, cutoff_section_len = 10000):
         sections = []
         section = ''
-        prev_chunk = None
 
         for chunk in re.split(r'\n\n+', text.strip()):
-            chunk = chunk.strip()
-            chunk_key = re.sub(r'\d+(\.\d+)?', '##', chunk)
-            sentences = self.parse_sentences(chunk) if chunk else []
-
-            if chunk and chunk_key not in index:
-                chunk = chunk.strip()
-
-                if re.search(r'^[\(\[\{\*\+\-].+', chunk) or (prev_chunk and re.search(r'[\,\:\;\-]$', prev_chunk)):
-                    section = "{}\n{}".format(section, chunk)
-                elif re.search(r'^[a-z]', chunk):
-                    section = "{} {}".format(section, chunk)
-                elif re.match(r'^[A-Z0-9\:\.\,\;\s]+$', chunk) or (chunk[-1] not in ('.', '?', '!') and len(sentences) == 1):
-                    if section:
-                        section = section.strip()
-                        section_sentences = self.parse_sentences(section)
-                        if len(section_sentences) <= 3 and len(sections):
-                            sections[-1] = "{}\n{}".format(sections[-1], section)
-                        else:
-                            sections.append(section)
-                    section = chunk
+            if chunk.strip():
+                combined_section = "{}\n{}".format(section, chunk).strip()
+                if len(combined_section) >= cutoff_section_len:
+                    sections.append(combined_section)
+                    section = ''
                 else:
-                    section = "{}\n{}".format(section, chunk)
-
-                index[chunk_key] = True
-                prev_chunk = chunk
+                    section = combined_section
 
         if section:
-            sections.append(section.strip())
+            sections.append(section)
 
         return sections
 
