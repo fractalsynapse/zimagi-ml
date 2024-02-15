@@ -27,10 +27,13 @@ class MLCommandMixin(CommandMixin('ml')):
             self.providers.append(provider)
         return provider
 
-    def parse_sentences(self, text):
+    def parse_sentences(self, text, **config):
         if not text:
             return []
-        return self.submit('agent:model:sentence_parser', text)
+        return self.submit('agent:model:sentence_parser', {
+            'text': text,
+            'config': config
+        })
 
 
     def get_encoder(self, **options):
@@ -47,20 +50,23 @@ class MLCommandMixin(CommandMixin('ml')):
             self.providers.append(provider)
         return provider
 
-    def generate_embeddings(self, sentences):
+    def generate_embeddings(self, sentences, **config):
         if not sentences:
             return []
-        return self.submit('agent:model:embedding', sentences)
+        return self.submit('agent:model:embedding', {
+            'sentences': sentences,
+            'config': config
+        })
 
-    def generate_text_embeddings(self, text):
+    def generate_text_embeddings(self, text, **config):
         text_data = Collection(sentences = [], embeddings = [])
         has_data = False
 
         for section in self.parse_text_sections(text.encode('ascii', 'ignore').decode().replace("\x00", '')):
-            sentences = self.parse_sentences(section)
+            sentences = self.parse_sentences(section, **config)
             if sentences:
                 text_data.sentences.extend(sentences)
-                text_data.embeddings.extend(self.generate_embeddings(sentences))
+                text_data.embeddings.extend(self.generate_embeddings(sentences, **config))
             has_data = True
 
         return text_data if has_data else None
@@ -84,10 +90,9 @@ class MLCommandMixin(CommandMixin('ml')):
         if not text:
             return None
         return self.submit('agent:model:summary', {
-                'text': text,
-                'config': config
-            }
-        )
+            'text': text,
+            'config': config
+        })
 
 
     def shutdown(self):

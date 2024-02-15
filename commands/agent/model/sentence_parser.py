@@ -11,11 +11,12 @@ class SentenceParser(Agent('model.sentence_parser')):
         channel = 'agent:model:sentence_parser'
 
         for package in self.listen(channel, state_key = 'model_sentence_parser'):
-            text = package.message
+            text = package.message['text']
+            config = package.message.get('config', {})
 
             try:
                 self.data('Processing sentence parsing request', package.sender)
-                response = self.profile(self._parse_model_sentences, text)
+                response = self.profile(self._parse_model_sentences, text, config)
                 sentence_lengths = [ len(sentence) for sentence in response.result ]
 
                 self.send(package.sender, response.result)
@@ -37,5 +38,5 @@ class SentenceParser(Agent('model.sentence_parser')):
                     'memory': response.memory
                 })
 
-    def _parse_model_sentences(self, text):
-        return self.sentence_parser.split(text)
+    def _parse_model_sentences(self, text, config):
+        return self.sentence_parser.split(text, **config)

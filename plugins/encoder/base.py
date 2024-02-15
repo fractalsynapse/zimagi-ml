@@ -31,5 +31,5 @@ class BaseProvider(BasePlugin('encoder')):
         raise NotImplementedError("Class get_chunk_length method required by all subclasses")
 
 
-    def encode(self, sentences):
+    def encode(self, sentences, **config):
         raise NotImplementedError("Class encode method required by all subclasses")

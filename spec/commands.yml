@@ -76,8 +76,16 @@ command:
                     help: "Text to parse sentences"
                     value_label: TEXT
                     tags: [model]
+                model_config:
+                    parser: variable
+                    type: str
+                    optional: "--config"
+                    help: "JSON encoded sentence model configurations"
+                    value_label: TEXT
+                    tags: [model]
             parse:
                 - text
+                - model_config
 
         embedding:
             base: model_user
@@ -90,8 +98,16 @@ command:
                     help: "Text sentences to generate embeddings"
                     value_label: TEXT
                     tags: [model]
+                model_config:
+                    parser: variable
+                    type: str
+                    optional: "--config"
+                    help: "JSON encoded embedding model configurations"
+                    value_label: TEXT
+                    tags: [model]
             parse:
                 - sentences
+                - model_config
 
         summary:
             base: model_user

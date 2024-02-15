@@ -38,7 +38,7 @@ class Provider(BaseProvider('encoder', 'di')):
             ))
 
 
-    def encode(self, sentences):
+    def encode(self, sentences, **config):
         if not sentences:
             return []
         return self._run_inference(

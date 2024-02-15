@@ -42,7 +42,7 @@ class Provider(BaseProvider('encoder', 'transformer')):
         return self._transformer[self.identifier]
 
 
-    def encode(self, sentences):
+    def encode(self, sentences, **config):
         if not sentences:
             return []
         return self.transformer.encode(sentences).tolist()

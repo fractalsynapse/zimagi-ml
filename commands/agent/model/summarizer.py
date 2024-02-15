@@ -15,7 +15,6 @@ class Summarizer(Agent('model.summarizer')):
             try:
                 self.data('Processing summary request', package.sender)
                 response = self.profile(self._parse_model_summary, text, config)
-
                 self.send(package.sender, response.result)
 
             except Exception as e:

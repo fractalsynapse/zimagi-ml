@@ -31,5 +31,5 @@ class BaseProvider(BasePlugin('sentence_parser')):
         return self.field_max_sentence_length
 
 
-    def split(self, text):
+    def split(self, text, **config):
         raise NotImplementedError("Class split method required by all subclasses")

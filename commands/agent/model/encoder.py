@@ -11,12 +11,14 @@ class Encoder(Agent('model.encoder')):
         channel = 'agent:model:embedding'
 
         for package in self.listen(channel, state_key = 'model_encoder'):
-            sentences = package.message
+            sentences = package.message['sentences']
+            config = package.message.get('config', {})
+
             sentence_lengths = [ len(sentence) for sentence in sentences ]
 
             try:
                 self.data('Processing embedding request', package.sender)
-                response = self.profile(self._parse_model_embeddings, sentences)
+                response = self.profile(self._parse_model_embeddings, sentences, config)
 
                 self.send(package.sender, response.result)
 
@@ -36,5 +38,5 @@ class Encoder(Agent('model.encoder')):
                     'memory': response.memory
                 })
 
-    def _parse_model_embeddings(self, sentences):
-        return self.encoder.encode(sentences)
+    def _parse_model_embeddings(self, sentences, config):
+        return self.encoder.encode(sentences, **config)
