@@ -4,6 +4,7 @@ from systems.models.index import Model
 from utility.data import Collection
 
 import time
+import re
 
 
 class BaseModelSummarizer(object):
@@ -105,7 +106,7 @@ class BaseModelSummarizer(object):
                     sentence = sentence_info.payload['sentence']
                     document_id = sentence_info.payload['document_id']
 
-                    if sentence_info.score >= 0.4:
+                    if sentence_info.score >= 0.4 and len(re.split(r'\s+', sentence.strip())) >= 5:
                         if document_id not in document_scores:
                             if document_id not in document_failed:
                                 document = self.document_facade.retrieve_by_id(document_id)
