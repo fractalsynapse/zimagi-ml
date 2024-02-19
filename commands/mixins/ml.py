@@ -88,7 +88,7 @@ class MLCommandMixin(CommandMixin('ml')):
 
     def generate_summary(self, text, **config):
         if not text:
-            return None
+            return ''
         return self.submit('agent:model:summary', {
             'text': text,
             'config': config
