@@ -69,6 +69,7 @@ class BaseModelSummarizer(object):
 
         documents = {}
         ranked_documents = {}
+        document_index = {}
         document_scores = {}
         document_failed = {}
 
@@ -99,9 +100,10 @@ class BaseModelSummarizer(object):
                     text_tokens.append(self.summarizer.get_token_count(section))
 
             text_token_count = sum(text_tokens)
-            while len(text_tokens) > 1 or text_token_count > max_token_count:
-                text_chunks.pop(0)
-                text_tokens.pop(0)
+            max_text_token_count = (max_token_count / 3)
+            while len(text_tokens) > 1 and text_token_count > max_text_token_count:
+                text_chunks.pop()
+                text_tokens.pop()
                 text_token_count = sum(text_tokens)
 
             chunks[chunk_index] = "\n\n".join(text_chunks)
@@ -160,7 +162,7 @@ class BaseModelSummarizer(object):
         if documents:
             for document_id, score in sorted(document_scores.items(), key = lambda x:x[1], reverse = True):
                 document = documents[document_id]
-                if document_sentences[document_id]:
+                if document_sentences[document_id] and document.get_index_key() not in document_index:
                     for section_index, section in enumerate(self.parse_sections(document, document_sentences[document_id])):
                         tokens = self.summarizer.get_token_count(section)
 
@@ -176,6 +178,7 @@ class BaseModelSummarizer(object):
                             chunks[chunk_index] = "{}\n\n{}".format(chunks[chunk_index], section)
 
                     ranked_documents["{:07.3f}:{}".format(score, document.id)] = document
+                    document_index[document.get_index_key()] = True
 
         return chunks, ranked_documents
 
