@@ -10,8 +10,8 @@ class MixtralSummaryMixin(ProviderMixin('mixtral_summary')):
 You always produce factually correct information from the text provided.
 You do not ask questions.
 <</SYS>>
+Refer exclusively to the following text for further questions and instructions:
 
-Consider the following text for further questions and instructions:
 {text}
 [/INST]
 I will refer to the provided text when following instructions
