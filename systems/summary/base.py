@@ -62,58 +62,39 @@ class BaseModelSummarizer(object):
 
 
     def _get_chunks(self, prompt, max_chunks, search_prompt = None, include_files = True, sentence_limit = 50):
-        max_token_count = self.summarizer.get_chunk_length()
-        prompt_token_count = self.summarizer.get_token_count(prompt)
-        text_token_count = 0
-        token_count = prompt_token_count
-
         documents = {}
         ranked_documents = {}
         document_index = {}
         document_scores = {}
         document_failed = {}
 
-        chunks = [""]
-        chunk_index = 0
+        chunks = []
 
         if not search_prompt:
             search_prompt = prompt
 
         # Get text chunks
         if self.text_facade and self.text_field:
-            text_chunks = []
-            text_tokens = []
-
             for text in self.text_facade.set_order(self.instance_order).field_values(self.text_field, **{
                 "{}__isnull".format(self.text_field): False,
                 self.text_id_field: self.instance.id,
                 **self.text_filters
             }):
                 if text.strip():
-                    section = "The following is a {} for the {}\n\n{}".format(
+                    section = "The following is a {} for the {} to be used for summarization and answering questions:\n\n{}".format(
                         self.text_field,
-                        self.text_facade.name,
+                        self.text_facade.name.replace('_', ' '),
                         text
                     ).strip()
 
-                    text_chunks.append(section)
-                    text_tokens.append(self.summarizer.get_token_count(section))
-
-            text_token_count = sum(text_tokens)
-            max_text_token_count = (max_token_count / 3)
-            while len(text_tokens) > 1 and text_token_count > max_text_token_count:
-                text_chunks.pop()
-                text_tokens.pop()
-                text_token_count = sum(text_tokens)
-
-            chunks[chunk_index] = "\n\n".join(text_chunks)
+                    chunks.append(section)
 
         # Find documents
         if include_files and self.document_facade and self.embedding_collection:
             total_sentences = 0
             document_sentences = {}
 
-            search = self.command.generate_text_embeddings(search_prompt)
+            search = self.command.generate_text_embeddings(search_prompt, validate = False)
             document_rankings = self.command.search_embeddings(self.embedding_collection,
                 search.embeddings,
                 limit = sentence_limit,
@@ -124,7 +105,7 @@ class BaseModelSummarizer(object):
             for index, ranking in enumerate(document_rankings):
                 for ranking_index, sentence_info in enumerate(ranking):
                     sentence = sentence_info.payload['sentence'].strip()
-                    if 'document_id' in sentence_info.payload and len(re.split(r'\s+', sentence)) >= 5:
+                    if 'document_id' in sentence_info.payload:
                         document_id = sentence_info.payload['document_id']
 
                         if document_id not in document_scores:
@@ -158,32 +139,28 @@ class BaseModelSummarizer(object):
                     ) * 100
                 )
 
-        # Get document chunks
         if documents:
             for document_id, score in sorted(document_scores.items(), key = lambda x:x[1], reverse = True):
                 document = documents[document_id]
-                if document_sentences[document_id] and document.get_index_key() not in document_index:
-                    for section_index, section in enumerate(self.parse_sections(document, document_sentences[document_id])):
-                        tokens = self.summarizer.get_token_count(section)
+                completed = False
 
-                        if (token_count + tokens) > max_token_count:
-                            if not max_chunks or chunk_index < max_chunks:
-                                chunk_index += 1
-                                chunks.append(section)
-                                token_count = tokens
-                            else:
-                                break
+                if document_sentences[document_id] and document.name not in document_index:
+                    for section_index, section in enumerate(self.parse_sections(document, document_sentences[document_id])):
+                        if len(chunks) < max_chunks:
+                            chunks.append(section)
                         else:
-                            token_count += tokens
-                            chunks[chunk_index] = "{}\n\n{}".format(chunks[chunk_index], section)
+                            completed = True
+                            break
 
                     ranked_documents["{:07.3f}:{}".format(score, document.id)] = document
-                    document_index[document.get_index_key()] = True
+                    document_index[document.name] = True
+                    if completed:
+                        break
 
         return chunks, ranked_documents
 
 
-    def parse_sections(self, document, sentences, max_section_tokens = 6000, selectivity = -2):
+    def parse_sections(self, document, sentences, max_section_tokens = 3500, selectivity = -2):
         max_period_tokens = (max_section_tokens / 2)
         sentence_map = {}
         sections = []
@@ -216,7 +193,7 @@ class BaseModelSummarizer(object):
                         break
                     before_context.append(previous_sentence)
                     before_tokens += previous_tokens
-                    sentence_map[(sentence_index - before_index - 1)] = previous_sentence
+                    sentence_map[before_index] = previous_sentence
 
                 # Find relevant after
                 for after_index in range((sentence_index + 1), len(document.sentences)):
@@ -226,72 +203,73 @@ class BaseModelSummarizer(object):
                         break
                     after_context.append(next_sentence)
                     after_tokens += next_tokens
-                    sentence_map[(sentence_index + after_index + 1)] = next_sentence
+                    sentence_map[after_index] = next_sentence
 
                 # Find similarity around context
-                if False: # self.command.debug:
+                if self.command.debug and self.command.verbosity == 3:
                     self.command.info('=' * self.command.display_width)
                     self.command.info('')
                     self.command.info('-------------------------------')
                     self.command.info('Sentence')
                     self.command.info('-------------------------------')
-                    self.command.notice(sentence)
+                    self.command.notice("{} ( {} )".format(sentence, sentence_index))
+                    self.command.notice("Tokens: {} / {}".format(before_tokens, after_tokens))
 
-                # sentence_embeddings = self.command.generate_embeddings([ sentence ])
+                sentence_embeddings = self.command.generate_embeddings([ sentence ])
 
-                # if len(before_context):
-                #     previous_similarities = cosine_similarity(
-                #         sentence_embeddings,
-                #         self.command.generate_embeddings(before_context)
-                #     )[0]
-                #     cutoff_score = None
-                #     if len(previous_similarities) > 1:
-                #         cutoff_score = max(statistics.mean(previous_similarities) + (selectivity * statistics.stdev(previous_similarities)), 0)
+                if len(before_context):
+                    previous_similarities = cosine_similarity(
+                        sentence_embeddings,
+                        self.command.generate_embeddings(before_context)
+                    )[0]
+                    cutoff_score = None
+                    if len(previous_similarities) > 1:
+                        cutoff_score = max(statistics.mean(previous_similarities) + (selectivity * statistics.stdev(previous_similarities)), 0)
 
-                #     if False: # self.command.debug:
-                #         self.command.info('')
-                #         self.command.info('-------------------------------')
-                #         self.command.info('Processing Previous Similarities')
-                #         self.command.info('-------------------------------')
-                #         self.command.data('Cutoff', cutoff_score)
+                    if self.command.debug and self.command.verbosity == 3:
+                        self.command.info('')
+                        self.command.info('-------------------------------')
+                        self.command.info('Processing Previous Similarities')
+                        self.command.info('-------------------------------')
+                        self.command.data('Cutoff', cutoff_score)
 
-                #     for index, sentence in enumerate(before_context):
-                #         score = previous_similarities[index]
-                #         if cutoff_score and score < cutoff_score:
-                #             del before_context[index:]
-                #             break
+                    for index, sentence in enumerate(before_context):
+                        score = previous_similarities[index]
+                        if cutoff_score and score < cutoff_score:
+                            del before_context[index:]
+                            break
 
-                #         if False: # self.command.debug:
-                #             self.command.data(score, sentence)
+                        if self.command.debug and self.command.verbosity == 3:
+                            self.command.data(score, sentence)
 
-                #         sentence_map[(sentence_index - index - 1)] = sentence
+                        sentence_map[(sentence_index - index - 1)] = sentence
 
-                # if len(after_context):
-                #     next_similarities = cosine_similarity(
-                #         sentence_embeddings,
-                #         self.command.generate_embeddings(after_context)
-                #     )[0]
-                #     cutoff_score = None
-                #     if len(next_similarities) > 1:
-                #         cutoff_score = max(statistics.mean(next_similarities) + (selectivity * statistics.stdev(next_similarities)), 0)
+                if len(after_context):
+                    next_similarities = cosine_similarity(
+                        sentence_embeddings,
+                        self.command.generate_embeddings(after_context)
+                    )[0]
+                    cutoff_score = None
+                    if len(next_similarities) > 1:
+                        cutoff_score = max(statistics.mean(next_similarities) + (selectivity * statistics.stdev(next_similarities)), 0)
 
-                #     if False: # self.command.debug:
-                #         self.command.info('')
-                #         self.command.info('-------------------------------')
-                #         self.command.info('Processing Next Similarities')
-                #         self.command.info('-------------------------------')
-                #         self.command.data('Cutoff', cutoff_score)
+                    if self.command.debug and self.command.verbosity == 3:
+                        self.command.info('')
+                        self.command.info('-------------------------------')
+                        self.command.info('Processing Next Similarities')
+                        self.command.info('-------------------------------')
+                        self.command.data('Cutoff', cutoff_score)
 
-                #     for index, sentence in enumerate(after_context):
-                #         score = next_similarities[index]
-                #         if cutoff_score and score < cutoff_score:
-                #             del after_context[index:]
-                #             break
+                    for index, sentence in enumerate(after_context):
+                        score = next_similarities[index]
+                        if cutoff_score and score < cutoff_score:
+                            del after_context[index:]
+                            break
 
-                #         if False: # self.command.debug:
-                #             self.command.data(score, sentence)
+                        if self.command.debug and self.command.verbosity == 3:
+                            self.command.data(score, sentence)
 
-                #         sentence_map[(sentence_index + index + 1)] = sentence
+                        sentence_map[(sentence_index + index + 1)] = sentence
 
             except ValueError:
                 pass
@@ -304,8 +282,9 @@ class BaseModelSummarizer(object):
 
             if previous_index is None or ((sentence_index - previous_index) > 1):
                 # New section
-                sections.append("\n".join(section))
-                section = [ "The following is an excerpt from a document relevant to the query:\n\n", sentence ]
+                if previous_index:
+                    sections.append("\n".join(section))
+                section = [ "The following is an excerpt from document '{}' to be used for summarization and answering questions:\n\n".format(document.name), sentence ]
             else:
                 # Continue section
                 section.append(sentence)
@@ -318,10 +297,14 @@ class BaseModelSummarizer(object):
         return sections
 
 
-    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 2, include_files = True, sentence_limit = 50, **config):
+    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 10, include_files = True, sentence_limit = 50, **config):
 
         def generate_summary(info):
-            _sub_prompt = "Extract and format the relevant information from the provided text for the following request: {}".format(prompt)
+            _sub_prompt = """
+Extract only the relevant information from the provided text for the following request: {}
+
+If there is no directly relevant information in the provided text answer simply with "No information available".
+""".format(prompt)
             _request_tokens = self.summarizer.get_token_count(info['text'])
             _summary_text = self.command.generate_summary(info['text'], prompt = _sub_prompt, **config)
             _response_tokens = self.summarizer.get_token_count(_summary_text)
@@ -365,13 +348,14 @@ Response Tokens: {}
             _response_tokens = 0
 
             if len(_chunks):
-                if (not max_chunks or max_chunks > 1) and len(_chunks) > 1:
+                if len(_chunks) > 1:
                     _results = self.command.run_list(_chunks, generate_summary)
                     _chunk_text = {}
                     for _chunk in _results.data:
-                        _chunk_text[_chunk.result['index']] = _chunk.result['text']
-                        _request_tokens += _chunk.result['request_tokens']
-                        _response_tokens += _chunk.result['response_tokens']
+                        if not re.search(r'No information[a-z\s]+available', _chunk.result['text']):
+                            _chunk_text[_chunk.result['index']] = _chunk.result['text']
+                            _request_tokens += _chunk.result['request_tokens']
+                            _response_tokens += _chunk.result['response_tokens']
 
                     _summary_text, _final_request_tokens, _final_response_tokens, _chunk_documents = summarize(
                         "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
