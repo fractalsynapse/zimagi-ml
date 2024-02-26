@@ -1,7 +1,7 @@
 command_mixins:
     ml:
         class: MLCommandMixin
-        mixins: [qdrant]
+        mixins: [qdrant, summary]
         parameters:
             instruction:
                 parser: variable
