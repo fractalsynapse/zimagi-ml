@@ -1,0 +1,98 @@
+data_mixins:
+  summary:
+    class: SummaryMixin
+    fields:
+      summary:
+        type: '@django.ForeignKey'
+        relation: summary
+        options:
+          on_delete: '@django.CASCADE'
+  summary_optional:
+    class: SummaryOptionalMixin
+    fields:
+      summary:
+        type: '@django.ForeignKey'
+        relation: summary
+        options:
+          on_delete: '@django.SET_NULL'
+          'null': true
+  summaries:
+    class: SummaryMultipleMixin
+    fields:
+      summaries:
+        type: '@django.ManyToManyField'
+        relation: summary
+        options:
+          blank: true
+data_base:
+  summary:
+    class: SummaryBase
+    base: id_resource
+    mixins:
+    - summary
+    id_fields:
+    - summary_id
+    - name
+    meta:
+      unique_together:
+      - summary
+      - name
+      scope: summary
+data:
+  summary:
+    class: Summary
+    base: id_resource
+    key: id
+    api: true
+    display: <id>
+    roles:
+      edit:
+      - data-admin
+      view:
+      - data-auditor
+    fields:
+      name: null
+      text:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      format:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      result:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      persona:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      config:
+        type: '@zimagi.DictionaryField'
+        color: json
+        options:
+          editable: true
+          system: false
+      prompt:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+    meta:
+      ordering:
+      - id

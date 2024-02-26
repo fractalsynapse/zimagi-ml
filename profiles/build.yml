@@ -1,0 +1,29 @@
+_base_model: &base_model
+    base: id_resource
+    key: id
+    admin_roles: [data-admin]
+    view_roles: [data-auditor]
+    priority: 60
+
+models:
+    summary:
+        <<: *base_model
+        plural: summaries
+        id_fields: []
+        name_field: false
+        key: id
+        display: "<id>"
+        priority: 65
+        fields:
+            text:
+                type: text
+            prompt:
+                type: text
+            persona:
+                type: text
+            format:
+                type: text
+            config:
+                type: dict
+            result:
+                type: text
