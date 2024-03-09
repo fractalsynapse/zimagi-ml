@@ -35,7 +35,11 @@ class Provider(BaseProvider('sentence_parser', 'spacy')):
 
         def _get_sentences(inner_text):
             if len(inner_text) > char_limit:
-                sentence_index = (inner_text[:char_limit].rindex('.') + 1)
+                sentence_index = None
+                for match in re.findall(r'([^\.]\.|\?|\!)(?=\s+)', inner_text[:char_limit], re.MULTILINE):
+                    sentence_index = match.end()
+                sentence_index = sentence_index if sentence_index else char_limit
+
                 sentences = [
                     *_get_sentences(inner_text[:sentence_index].strip()),
                     *_get_sentences(inner_text[sentence_index:].strip())
