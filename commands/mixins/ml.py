@@ -30,10 +30,17 @@ class MLCommandMixin(CommandMixin('ml')):
     def parse_sentences(self, text, **config):
         if not text:
             return []
-        return self.submit('agent:model:sentence_parser', {
-            'text': text,
-            'config': config
-        })
+
+        sentences = []
+        for section in self.parse_text_sections(text.encode('ascii', 'ignore').decode().replace("\x00", '')):
+            section_sentences = self.submit('agent:model:sentence_parser', {
+                'text': section,
+                'config': config
+            })
+            if section_sentences:
+                sentences.extend(section_sentences)
+
+        return sentences
 
 
     def get_encoder(self, **options):
@@ -59,17 +66,15 @@ class MLCommandMixin(CommandMixin('ml')):
         })
 
     def generate_text_embeddings(self, text, **config):
-        text_data = Collection(sentences = [], embeddings = [])
-        has_data = False
+        sentences = self.parse_sentences(text, **config)
+        text_data = None
 
-        for section in self.parse_text_sections(text.encode('ascii', 'ignore').decode().replace("\x00", '')):
-            sentences = self.parse_sentences(section, **config)
-            if sentences:
-                text_data.sentences.extend(sentences)
-                text_data.embeddings.extend(self.generate_embeddings(sentences, **config))
-            has_data = True
-
-        return text_data if has_data else None
+        if sentences:
+            text_data = Collection(
+                sentences = sentences,
+                embeddings = self.generate_embeddings(sentences, **config)
+            )
+        return text_data
 
 
     def get_summarizer(self, **options):
