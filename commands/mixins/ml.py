@@ -106,33 +106,36 @@ class MLCommandMixin(CommandMixin('ml')):
             text, summary_prompt, summary_persona, summary_format, summary_config
         ])
 
-        summary = self._summary.get_or_create(summary_id)
-        summary.text = text
-        summary.persona = summary_persona
-        summary.prompt = summary_prompt
-        summary.format = summary_format
-        summary.config = summary_config
+        def generate():
+            summary = self._summary.get_or_create(summary_id)
+            summary.text = text
+            summary.persona = summary_persona
+            summary.prompt = summary_prompt
+            summary.format = summary_format
+            summary.config = summary_config
 
-        if self.debug and self.verbosity == 3:
-            self.notice('Generating summary')
-            self.info("\n")
-            self.info(text)
-            self.info("\n")
-            self.info(dump_json(config, indent = 2))
-            self.info("\n")
-            self.info('-' * self.display_width)
+            if self.debug and self.verbosity == 3:
+                self.notice('Generating summary')
+                self.info("\n")
+                self.info(text)
+                self.info("\n")
+                self.info(dump_json(config, indent = 2))
+                self.info("\n")
+                self.info('-' * self.display_width)
 
-        result = self.submit('agent:model:summary', {
-            'text': text,
-            'config': config
-        })
-        if self.debug and self.verbosity == 3:
-            self.info("\n")
-            self.info(result)
+            result = self.submit('agent:model:summary', {
+                'text': text,
+                'config': config
+            })
+            if self.debug and self.verbosity == 3:
+                self.info("\n")
+                self.info(result)
 
-        summary.result = result
-        summary.save()
-        return result
+            summary.result = result
+            summary.save()
+            return result
+
+        return self.run_exclusive("ml-summary-{}".format(summary_id), generate)
 
 
     def shutdown(self):
