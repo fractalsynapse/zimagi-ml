@@ -24,7 +24,7 @@ class Provider(BaseProvider('encoder', 'di')):
                 'Authorization': "bearer {}".format(settings.DEEPINFRA_API_KEY),
                 'Content-Type': 'application/json'
             },
-            timeout = 600,
+            timeout = 1000,
             json = config
         )
         response_data = load_json(response.text)
