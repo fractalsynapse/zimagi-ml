@@ -18,18 +18,34 @@ class Provider(BaseProvider('encoder', 'di')):
 
 
     def _run_inference(self, **config):
-        response = requests.post(
-            "https://api.deepinfra.com/v1/inference/sentence-transformers/{}".format(self._get_model_name()),
-            headers = {
-                'Authorization': "bearer {}".format(settings.DEEPINFRA_API_KEY),
-                'Content-Type': 'application/json'
-            },
-            timeout = 1000,
-            json = config
-        )
-        response_data = load_json(response.text)
+        wait_sec = 1
 
-        if response.status_code == 200 and response_data['embeddings']:
+        while True:
+            try:
+                response = requests.post(
+                    "https://api.deepinfra.com/v1/inference/sentence-transformers/{}".format(self._get_model_name()),
+                    headers = {
+                        'Authorization': "bearer {}".format(settings.DEEPINFRA_API_KEY),
+                        'Content-Type': 'application/json'
+                    },
+                    timeout = 2000,
+                    json = config
+                )
+                break
+
+            except requests.exceptions.ConnectionError as e:
+                self.command.warning(str(e))
+
+            wait_sec = min((wait_sec * 2), 300)
+            time.sleep(wait_sec)
+
+        try:
+            response_data = load_json(response.text)
+        except Exception as e:
+            self.command.warning("Invalid JSON returned: {}".format(response.text))
+            response_data = None
+
+        if response.status_code == 200 and response_data and response_data['embeddings']:
             return response_data['embeddings']
         else:
             raise DeepInfraRequestError("DeepInfra inference request failed with code {}: {}".format(
