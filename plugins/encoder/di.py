@@ -38,6 +38,7 @@ class Provider(BaseProvider('encoder', 'di')):
 
                 except Exception as e:
                     self.command.warning("Invalid JSON returned: {}".format(response.text))
+                    self.command.data("Parameters", config)
 
             except requests.exceptions.ConnectionError as e:
                 self.command.warning(str(e))
