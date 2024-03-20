@@ -61,7 +61,7 @@ class MLCommandMixin(CommandMixin('ml')):
         if not sentences:
             return []
 
-        section_length = 100
+        section_length = 1000
         sections = [
             sentences[index * section_length:(index + 1) * section_length]
             for index in range((len(sentences) + section_length - 1) // section_length)
