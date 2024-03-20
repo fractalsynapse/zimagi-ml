@@ -60,10 +60,21 @@ class MLCommandMixin(CommandMixin('ml')):
     def generate_embeddings(self, sentences, **config):
         if not sentences:
             return []
-        return self.submit('agent:model:embedding', {
-            'sentences': sentences,
-            'config': config
-        })
+
+        section_length = 100
+        sections = [
+            sentences[index * section_length:(index + 1) * section_length]
+            for index in range((len(sentences) + section_length - 1) // section_length)
+        ]
+        embeddings = []
+
+        for section in sections:
+            embeddings.extend(self.submit('agent:model:embedding', {
+                'sentences': section,
+                'config': config
+            }))
+
+        return embeddings
 
     def generate_text_embeddings(self, text, **config):
         sentences = self.parse_sentences(text, **config)
