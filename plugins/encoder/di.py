@@ -31,7 +31,12 @@ class Provider(BaseProvider('encoder', 'di')):
                     timeout = 2000,
                     json = config
                 )
-                break
+                try:
+                    response_data = load_json(response.text)
+                    break
+
+                except Exception as e:
+                    self.command.warning("Invalid JSON returned: {}".format(response.text))
 
             except requests.exceptions.ConnectionError as e:
                 self.command.warning(str(e))
@@ -39,13 +44,7 @@ class Provider(BaseProvider('encoder', 'di')):
             wait_sec = min((wait_sec * 2), 300)
             time.sleep(wait_sec)
 
-        try:
-            response_data = load_json(response.text)
-        except Exception as e:
-            self.command.warning("Invalid JSON returned: {}".format(response.text))
-            response_data = None
-
-        if response.status_code == 200 and response_data and response_data['embeddings']:
+        if response.status_code == 200 and response_data['embeddings']:
             return response_data['embeddings']
         else:
             raise DeepInfraRequestError("DeepInfra inference request failed with code {}: {}".format(
