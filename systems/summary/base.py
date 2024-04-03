@@ -88,6 +88,7 @@ class BaseModelSummarizer(object):
                     ).strip()
 
                     chunks.append(section)
+                    break
 
         # Find documents
         if include_files and self.document_facade and self.embedding_collection:
