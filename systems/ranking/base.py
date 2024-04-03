@@ -106,10 +106,10 @@ class BaseRanker(object):
         **options
     ):
         instance_data = self._generate_ranking(
-            search,
-            instance_ids,
-            cutoff_score,
-            focus_limit,
+            search = search,
+            instance_ids = instance_ids,
+            cutoff_score = cutoff_score,
+            focus_limit = focus_limit,
             **options
         )
         return self._filter_recommendations(
