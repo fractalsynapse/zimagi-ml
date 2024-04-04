@@ -72,7 +72,8 @@ class BaseRanker(object):
             self.command.info('Topic Index')
             self.command.info('-' * self.command.display_width)
             for topic, count in self.topic_index.items():
-                self.command.data(topic, count)
+                if count >= self.topic_mean:
+                    self.command.data(topic, count)
 
         return self._rank_instances(
             search,
@@ -190,38 +191,39 @@ class BaseRanker(object):
                         and sentence_info.score >= instance_data.cutoff_score:
 
                         if instance_id not in instance_data.scores:
-                            instance_data.scores[instance_id] = sentence_info.score
+                            instance_data.scores[instance_id] = topic_score
                             instance_data.counts[instance_id] = 1
                         else:
-                            instance_data.scores[instance_id] += sentence_info.score
+                            instance_data.scores[instance_id] += topic_score
                             instance_data.counts[instance_id] += 1
 
                         if self.command.debug:
-                            self.command.info(" * [ {} ] - {} ( {} )".format(instance_id, sentence_info.payload['sentence'], sentence_info.score))
+                            self.command.info(" * [ {} ] - {} ( {} )".format(instance_id, sentence_info.payload['sentence'], topic_score))
 
                     instance_data.index[group_id][sentence] = True
 
 
     def _calculate_scores(self, search, instance_data):
         if search:
-            search_total = (instance_data.focus_limit * 10)
+            # search_total = (instance_data.focus_limit * 10)
 
             for instance_id, instance_score in instance_data.scores.items():
-                instance_data.scores[instance_id] = (
-                    math.sqrt(
-                        (instance_score / instance_data.counts[instance_id])
-                        * (instance_data.counts[instance_id] / search_total)
-                    ) * 100
-                )
-                if self.command.debug:
-                    self.command.info("SQRT(({} / {}) * ({} / {})) * 100 = {}  [ {} ]".format(
-                        round(instance_score, 2),
-                        instance_data.counts[instance_id],
-                        instance_data.counts[instance_id],
-                        search_total,
-                        round(instance_data.scores[instance_id], 2),
-                        instance_id
-                    ))
+                instance_data.scores[instance_id] = instance_score
+                # instance_data.scores[instance_id] = (
+                #     math.sqrt(
+                #         (instance_score / instance_data.counts[instance_id])
+                #         * (instance_data.counts[instance_id] / search_total)
+                #     ) * 100
+                # )
+                # if self.command.debug:
+                #     self.command.info("SQRT(({} / {}) * ({} / {})) * 100 = {}  [ {} ]".format(
+                #         round(instance_score, 2),
+                #         instance_data.counts[instance_id],
+                #         instance_data.counts[instance_id],
+                #         search_total,
+                #         round(instance_data.scores[instance_id], 2),
+                #         instance_id
+                #     ))
 
         elif instance_data.ids:
             for instance_id in instance_data.ids:
