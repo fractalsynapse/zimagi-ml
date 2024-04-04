@@ -42,6 +42,7 @@ class TopicModel(object):
                     and len(str(word)) > 5 \
                     and word.pos_ not in ['PRON', 'ADJ', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']:
                     topic.append(str(word.lemma_).strip().lower())
+
             if topic and len(topic) < 4:
                 topics.append(" ".join(topic))
 
