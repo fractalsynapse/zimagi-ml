@@ -169,6 +169,11 @@ class BaseRanker(object):
                 limit = ((instance_data.focus_limit / len(search.sentences)) * 10)
             )
             for index, ranking in enumerate(instance_rankings):
+                if self.command.debug:
+                    self.command.info('-' * self.command.display_width)
+                    self.command.info(" * [ {} ] - {}".format(index, search.sentences[index]))
+                    self.command.info('')
+
                 self._score_instances(instance_data, index, ranking)
 
         return instance_data
