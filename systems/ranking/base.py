@@ -1,11 +1,13 @@
 from sklearn.metrics.pairwise import cosine_similarity
 
 from utility.data import Collection, ensure_list
+from utility.topics import TopicModel
 
 import re
 import math
 import statistics
 import copy
+
 
 
 class BaseRanker(object):
@@ -15,6 +17,9 @@ class BaseRanker(object):
         instance_facade
     ):
         self.command = command
+
+        self.topics = TopicModel()
+        self.topic_index = {}
 
         self.instance_facade = instance_facade
         self.instance_filters = {
@@ -44,13 +49,29 @@ class BaseRanker(object):
             raise NotImplementedError("Instance field 'instance_collection' must be set in subclass")
 
         search = self._generate_search(**options)
-        if search.text:
-            search = self._rank_sentences(
-                search, search.text,
-                focus_cutoff_score,
-                focus_selectivity,
-                focus_limit
-            )
+        if search:
+            if search.text:
+                search = self._rank_sentences(
+                    search, search.text,
+                    focus_cutoff_score,
+                    focus_selectivity,
+                    focus_limit
+                )
+
+            self.topic_index = self.topics.get_index(*search.sentences)
+
+            self.command.info('')
+            self.command.info('Search Sentences')
+            self.command.info('-' * self.command.display_width)
+            for sentence in search.sentences:
+                self.command.info(" * {}".format(sentence))
+
+            self.command.info('')
+            self.command.info('Topic Index')
+            self.command.info('-' * self.command.display_width)
+            for topic, count in self.topic_index.items():
+                self.command.data(topic, count)
+
         return self._rank_instances(
             search,
             instance_ids = self._filter(**options),
@@ -135,13 +156,6 @@ class BaseRanker(object):
             index = {}
         )
 
-        if self.command.debug and search:
-            self.command.info('')
-            self.command.info('Filtered Search Sentences')
-            self.command.info('-' * self.command.display_width)
-            for sentence in search.sentences:
-                self.command.info(" * {}".format(sentence))
-
         if search:
             instance_rankings = self._search_embeddings(
                 self.instance_collection,
@@ -167,12 +181,14 @@ class BaseRanker(object):
                     instance_data.index[group_id] = {}
 
                 if sentence not in instance_data.index[group_id]:
-                    if len(re.split(r'\s+', sentence.strip())) >= 5 and sentence_info.score >= instance_data.cutoff_score:
+                    topic_score = self._get_topic_score(sentence)
+
+                    if topic_score > 0 and sentence_info.score >= instance_data.cutoff_score:
                         if instance_id not in instance_data.scores:
-                            instance_data.scores[instance_id] = sentence_info.score
+                            instance_data.scores[instance_id] = (sentence_info.score * topic_score)
                             instance_data.counts[instance_id] = 1
                         else:
-                            instance_data.scores[instance_id] += sentence_info.score
+                            instance_data.scores[instance_id] += (sentence_info.score * topic_score)
                             instance_data.counts[instance_id] += 1
 
                         if self.command.debug:
@@ -247,11 +263,12 @@ class BaseRanker(object):
 
 
     def _rank_sentences(self, sentence_data, context_data, cutoff_score, selectivity, limit):
-        similarities = cosine_similarity(context_data.embeddings, sentence_data.embeddings)
         rankings = {}
         sentences = []
         embeddings = []
         scores = []
+        topic_index = self.topics.filtered_index(sentence_data.sentences, context_data.sentences)
+        similarities = cosine_similarity(context_data.embeddings, sentence_data.embeddings)
 
         # Focus text
         for context_index, context_rankings in enumerate(similarities):
@@ -264,7 +281,8 @@ class BaseRanker(object):
                         rankings[sentence_index].append(float(score))
 
         for sentence_index, sentence_scores in rankings.items():
-            rankings[sentence_index] = (max([ *sentence_scores, 0 ]) * statistics.mean(sentence_scores))
+            topic_score = self._get_topic_score(sentence_data.sentences[sentence_index], topic_index)
+            rankings[sentence_index] = (topic_score * max([ *sentence_scores, 0 ]) * statistics.mean(sentence_scores))
 
         values = rankings.values()
         stdev = statistics.stdev(values) if len(values) > 1 else 0
@@ -275,6 +293,7 @@ class BaseRanker(object):
                 sentences.append(sentence_data.sentences[sentence_index])
                 embeddings.append(sentence_data.embeddings[sentence_index])
                 scores.append(score)
+
                 if len(sentences) == limit:
                     break
 
@@ -283,6 +302,18 @@ class BaseRanker(object):
             embeddings = embeddings,
             scores = scores
         )
+
+
+    def _get_topic_score(self, sentence, topic_index = None):
+        if not topic_index:
+            topic_index = self.topic_index
+
+        topic_score = 0
+        for topic in self.topics.parse(sentence):
+            if topic in topic_index:
+                topic_score += topic_index[topic]
+
+        return topic_score
 
 
     def _get_embeddings(self, collection, id_field, ids):
