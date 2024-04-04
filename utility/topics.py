@@ -14,9 +14,7 @@ class TopicModel(object):
         index = {}
 
         for topic, count in self.get_index(*full_texts).items():
-            for context_topic in context_index.keys():
-                if set(topic.split()).intersection(context_topic.split()):
-                    index[topic] = count
+            index[topic] = count
 
         return index
 
