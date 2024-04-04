@@ -27,7 +27,7 @@ class TopicModel(object):
                     index[topic] = 1
                 else:
                     index[topic] += 1
-        return { key: value for key, value in sorted(index.items(), key = lambda item: item[1], reverse = True) }
+        return { topic: count for topic, count in sorted(index.items(), key = lambda item: item[1], reverse = True) if count > 1 }
 
 
     def parse(self, text):
