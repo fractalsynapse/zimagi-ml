@@ -39,7 +39,6 @@ class TopicModel(object):
             for index, word in enumerate(chunk):
                 if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
                     and not word.is_punct \
-                    and len(str(word)) > 5 \
                     and word.pos_ not in ['PRON', 'ADJ', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']:
                     topic.append(str(word.lemma_).strip().lower())
 
