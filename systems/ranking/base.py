@@ -181,14 +181,12 @@ class BaseRanker(object):
                     instance_data.index[group_id] = {}
 
                 if sentence not in instance_data.index[group_id]:
-                    topic_score = self._get_topic_score(sentence)
-
-                    if len(re.split(r'\s+', sentence.strip())) >= 5 and topic_score > 0 and sentence_info.score >= instance_data.cutoff_score:
+                    if len(re.split(r'\s+', sentence.strip())) >= 5 and sentence_info.score >= instance_data.cutoff_score:
                         if instance_id not in instance_data.scores:
-                            instance_data.scores[instance_id] = (sentence_info.score * topic_score)
+                            instance_data.scores[instance_id] = sentence_info.score
                             instance_data.counts[instance_id] = 1
                         else:
-                            instance_data.scores[instance_id] += (sentence_info.score * topic_score)
+                            instance_data.scores[instance_id] += sentence_info.score
                             instance_data.counts[instance_id] += 1
 
                         if self.command.debug:
