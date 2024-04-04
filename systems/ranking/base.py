@@ -20,6 +20,7 @@ class BaseRanker(object):
 
         self.topics = TopicModel()
         self.topic_index = {}
+        self.topic_mean = 0
 
         self.instance_facade = instance_facade
         self.instance_filters = {
@@ -59,6 +60,7 @@ class BaseRanker(object):
                 )
 
             self.topic_index = self.topics.get_index(*search.sentences)
+            self.topic_mean = statistics.mean(self.topic_index.values())
 
             self.command.info('')
             self.command.info('Search Sentences')
@@ -181,7 +183,12 @@ class BaseRanker(object):
                     instance_data.index[group_id] = {}
 
                 if sentence not in instance_data.index[group_id]:
-                    if len(re.split(r'\s+', sentence.strip())) >= 5 and sentence_info.score >= instance_data.cutoff_score:
+                    topic_score = self._get_topic_score(sentence)
+
+                    if len(re.split(r'\s+', sentence.strip())) >= 5 \
+                        and topic_score >= self.topic_mean \
+                        and sentence_info.score >= instance_data.cutoff_score:
+
                         if instance_id not in instance_data.scores:
                             instance_data.scores[instance_id] = sentence_info.score
                             instance_data.counts[instance_id] = 1
