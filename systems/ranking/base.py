@@ -32,6 +32,8 @@ class BaseRanker(object):
         self.group_id_field = None
         self.instance_collection = None
 
+        self.instance_topics_field = 'topics'
+
 
     def generate(self,
         focus_cutoff_score = None,
@@ -60,7 +62,8 @@ class BaseRanker(object):
                 )
 
             self.topic_index = self.topics.get_index(*search.sentences)
-            self.topic_mean = statistics.mean(self.topic_index.values())
+            if self.topic_index:
+                self.topic_mean = statistics.mean(self.topic_index.values())
 
             self.command.info('')
             self.command.info('Search Sentences')
@@ -117,7 +120,12 @@ class BaseRanker(object):
         return list(self._filter_instances(**options).values_list('id', flat = True))
 
     def _filter_instances(self, **options):
-        return self.instance_facade.filter(**self.instance_filters)
+        instance_query = self.instance_facade.filter(**self.instance_filters)
+        if self.topic_index:
+            instance_query = instance_query.filter(
+                **{ "{}__has_any_keys".format(self.instance_topics_field): list(self.topic_index.keys()) }
+            )
+        return instance_query
 
 
     def _rank_instances(self,
