@@ -8,6 +8,7 @@ class TopicModel(object):
 
     def __init__(self):
         self.spacy = spacy.load('en_core_web_lg')
+        self.spacy.max_length = 3000000
 
 
     def filtered_index(self, full_texts, context_texts):
