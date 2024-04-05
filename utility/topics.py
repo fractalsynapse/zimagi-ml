@@ -6,7 +6,7 @@ import spacy
 
 class TopicModel(object):
 
-    text_max_length = 1000000
+    text_max_length = 100000
 
 
     def __init__(self):
