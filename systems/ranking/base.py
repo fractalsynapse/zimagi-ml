@@ -77,20 +77,15 @@ class BaseRanker(object):
                 if count >= self.topic_mean:
                     self.command.data(topic, count)
 
-        return self._get_ranked_instances(
-            self._filter(**options),
-            search_selectivity,
-            search_limit
+        return self._rank_instances(
+            search,
+            instance_ids = self._filter(**options),
+            cutoff_score = search_cutoff_score,
+            selectivity = search_selectivity,
+            search_limit = search_limit,
+            focus_limit = focus_limit,
+            **options
         )
-        # return self._rank_instances(
-        #     search,
-        #     instance_ids = self._filter(**options),
-        #     cutoff_score = search_cutoff_score,
-        #     selectivity = search_selectivity,
-        #     search_limit = search_limit,
-        #     focus_limit = focus_limit,
-        #     **options
-        # )
 
 
     def _generate_search(self,
@@ -246,24 +241,6 @@ class BaseRanker(object):
                 instance_data.scores[instance_id] = -1
 
         return instance_data.scores
-
-
-    def _get_ranked_instances(self, instance_ids, selectivity, search_limit):
-        scores = {}
-
-        for instance_id in instance_ids:
-            instance = self.instance_facade.retrieve_by_id(instance_id)
-            scores[instance_id] = self._get_instance_score(instance)
-
-        return self._filter_recommendations(scores, selectivity, search_limit)
-
-    def _get_instance_score(self, instance):
-        score = 0
-        if instance.topics:
-            for topic, count in instance.topics.items():
-                if topic in self.topic_index:
-                    score += (count * self.topic_index[topic])
-        return score
 
 
     def _filter_recommendations(self, scores, selectivity, search_limit):
