@@ -242,6 +242,18 @@ class BaseRanker(object):
 
         return instance_data.scores
 
+
+    def _get_ranked_instances(self, instance_ids):
+        ranked_instances = []
+
+        for instance_Id in instance_ids:
+            instance = self.instance_facade.retrieve_by_id(instance_id)
+
+
+
+        return ranked_instances
+
+
     def _filter_recommendations(self, scores, selectivity, search_limit):
         ranked_instances = []
         score_values = scores.values()
@@ -256,9 +268,6 @@ class BaseRanker(object):
 
         for instance_id, score in sorted(scores.items(), key = lambda x: float(x[1]), reverse = True):
             instance = self.instance_facade.retrieve_by_id(instance_id)
-            print('-------')
-            print(score)
-            print(cutoff_score)
             if instance and score >= cutoff_score:
                 ranked_instances.append(Collection(
                     score = score,
@@ -279,8 +288,6 @@ class BaseRanker(object):
                         self.command.success_color(round(score, 2)),
                         self.command.key_color(getattr(instance, self.instance_name_field))
                     ))
-
-        print(ranked_instances)
         return ranked_instances
 
 
