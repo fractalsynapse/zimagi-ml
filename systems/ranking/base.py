@@ -248,7 +248,7 @@ class BaseRanker(object):
         return instance_data.scores
 
 
-    def _get_ranked_instances(self, instance_ids):
+    def _get_ranked_instances(self, instance_ids, selectivity, search_limit):
         scores = {}
 
         for instance_id in instance_ids:
