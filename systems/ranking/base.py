@@ -21,6 +21,8 @@ class BaseRanker(object):
         self.topic_index = {}
         self.topic_mean = 0
 
+        self.instance_index = {}
+
         self.instance_facade = instance_facade
         self.instance_filters = {
             'processed_time__isnull': False,
@@ -217,24 +219,41 @@ class BaseRanker(object):
 
     def _calculate_scores(self, search, instance_data):
         if search:
+            if self.command.debug:
+                self.command.info('')
+
             search_total = (instance_data.focus_limit * 10)
 
             for instance_id, instance_score in instance_data.scores.items():
-                instance_data.scores[instance_id] = (
-                    math.sqrt(
+                instance = self.instance_facade.retrieve_by_id(instance_id)
+
+                if instance:
+                    topic_score = 1
+                    for topic, count in self.topics.get_index(instance.name).items():
+                        if topic in self.topic_index:
+                            topic_score += (100 * count * self.topic_index[topic])
+                    if instance.description:
+                        for topic, count in self.topics.get_index(instance.description).items():
+                            if topic in self.topic_index:
+                                topic_score += (count * self.topic_index[topic])
+
+                    instance_data.scores[instance_id] = (
                         (instance_score / instance_data.counts[instance_id])
                         * (instance_data.counts[instance_id] / search_total)
-                    ) * 100
-                )
-                if self.command.debug:
-                    self.command.info("SQRT(({} / {}) * ({} / {})) * 100 = {}  [ {} ]".format(
-                        round(instance_score, 2),
-                        instance_data.counts[instance_id],
-                        instance_data.counts[instance_id],
-                        search_total,
-                        round(instance_data.scores[instance_id], 2),
-                        instance_id
-                    ))
+                        * topic_score
+                    )
+                    self.instance_index[instance_id] = instance
+
+                    if self.command.debug:
+                        self.command.info("({} / {}) * ({} / {}) * {} = {}  [ {} ]".format(
+                            round(instance_score, 2),
+                            instance_data.counts[instance_id],
+                            instance_data.counts[instance_id],
+                            search_total,
+                            topic_score,
+                            round(instance_data.scores[instance_id], 2),
+                            instance_id
+                        ))
 
         elif instance_data.ids:
             for instance_id in instance_data.ids:
@@ -256,7 +275,7 @@ class BaseRanker(object):
             self.command.info('-' * self.command.display_width)
 
         for instance_id, score in sorted(scores.items(), key = lambda x: float(x[1]), reverse = True):
-            instance = self.instance_facade.retrieve_by_id(instance_id)
+            instance = self.instance_index[instance_id]
             if instance and score >= cutoff_score:
                 ranked_instances.append(Collection(
                     score = score,
