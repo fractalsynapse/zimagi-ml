@@ -241,11 +241,12 @@ class BaseRanker(object):
                         (instance_score / instance_data.counts[instance_id])
                         * (instance_data.counts[instance_id] / search_total)
                         * topic_score
+                        * 100
                     )
                     self.instance_index[instance_id] = instance
 
                     if self.command.debug:
-                        self.command.info("({} / {}) * ({} / {}) * {} = {}  [ {} ]".format(
+                        self.command.info("({} / {}) * ({} / {}) * {} * 100 = {}  [ {} ]".format(
                             round(instance_score, 2),
                             instance_data.counts[instance_id],
                             instance_data.counts[instance_id],
