@@ -234,7 +234,7 @@ class BaseRanker(object):
             for instance_id, instance_score in instance_data.scores.items():
                 instance = self.instance_facade.retrieve_by_id(instance_id)
 
-                if instance:
+                if instance and instance_data.counts[instance_id] > 1:
                     topic_score = self._calculate_topic_score(instance)
 
                     instance_data.scores[instance_id] = (
