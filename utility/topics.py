@@ -56,16 +56,16 @@ class TopicModel(object):
         topics = []
 
         for chunk in parser.noun_chunks:
-            if not bool(re.search(r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)', str(chunk))):
-                topic = []
-                for index, word in enumerate(chunk):
-                    if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
-                        and not word.is_punct \
-                        and len(str(word)) > 1 \
-                        and word.pos_ not in ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']:
-                        topic.append(str(word.lemma_).strip().lower())
+            topic = []
+            for index, word in enumerate(chunk):
+                if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
+                    and not word.is_punct \
+                    and len(str(word)) > 1 \
+                    and not bool(re.search(r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)', str(word))) \
+                    and word.pos_ not in ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']:
+                    topic.append(str(word.lemma_).strip().lower())
 
-                if topic and len(topic) < 4:
-                    topics.append(" ".join([ word.strip() for word in topic ]).strip())
+            if topic and len(topic) < 4:
+                topics.append(" ".join([ word.strip() for word in topic ]).strip())
 
         return topics
