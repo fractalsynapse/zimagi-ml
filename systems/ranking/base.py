@@ -76,8 +76,7 @@ class BaseRanker(object):
             self.command.info('Topic Index')
             self.command.info('-' * self.command.display_width)
             for topic, count in self.topic_index.items():
-                if count >= self.topic_mean:
-                    self.command.data(topic, count)
+                self.command.data(topic, count)
 
         return self._rank_instances(
             search,
@@ -201,7 +200,6 @@ class BaseRanker(object):
                     topic_score = self._get_topic_score(sentence)
 
                     if len(re.split(r'\s+', sentence.strip())) >= 5 \
-                        and topic_score >= self.topic_mean \
                         and sentence_info.score >= instance_data.cutoff_score:
 
                         if instance_id not in instance_data.scores:
