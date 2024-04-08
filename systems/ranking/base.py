@@ -269,14 +269,14 @@ class BaseRanker(object):
         for keyword in self.keywords:
             count = instance_name.count(keyword)
             if count:
-                topic_score += (100 * count)
+                topic_score += (1000 * count)
 
         if getattr(instance, self.instance_text_field):
             instance_text = getattr(instance, self.instance_text_field).lower()
             for keyword in self.keywords:
                 count = instance_text.count(keyword)
                 if count:
-                    topic_score += (10 * count)
+                    topic_score += (100 * count)
 
         return topic_score
 
