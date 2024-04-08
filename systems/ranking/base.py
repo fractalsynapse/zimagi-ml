@@ -4,6 +4,7 @@ from utility.data import Collection, ensure_list
 from utility.topics import TopicModel
 
 import re
+import string
 import math
 import statistics
 import copy
@@ -267,16 +268,16 @@ class BaseRanker(object):
     def _calculate_topic_score(self, instance):
         topic_score = 1
 
-        instance_name = getattr(instance, self.instance_name_field).lower()
+        instance_name_words = self._get_words(getattr(instance, self.instance_name_field))
         for keyword in self.keywords:
-            count = instance_name.count(keyword)
+            count = self._count_keywords(keyword, instance_name_words)
             if count:
                 topic_score += (1000 * count)
 
         if getattr(instance, self.instance_text_field):
-            instance_text = getattr(instance, self.instance_text_field).lower()
+            instance_text_words = self._get_words(getattr(instance, self.instance_text_field))
             for keyword in self.keywords:
-                count = instance_text.count(keyword)
+                count = self._count_keywords(keyword, instance_text_words)
                 if count:
                     topic_score += (100 * count)
 
@@ -421,3 +422,13 @@ class BaseRanker(object):
                     break
 
         return web_info
+
+
+    def _get_words(self, text):
+        if not getattr(self, '_punctuation_table', None):
+            self._punctuation_table = str.maketrans(dict.fromkeys(string.punctuation))
+        text = text.translate(self._punctuation_table).lower()
+        return re.split(r'\s+', text)
+
+    def _count_keywords(self, keyword, words):
+        return len([ word for word in words if word == keyword ])
