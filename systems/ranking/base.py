@@ -240,7 +240,6 @@ class BaseRanker(object):
                     if instance.description:
                         print('')
                         print('D=========================')
-                        print(instance.description)
                         for topic, count in self.topics.get_index(instance.description).items():
                             print("{}: {}".format(topic, count))
                             if topic in self.topic_index:
