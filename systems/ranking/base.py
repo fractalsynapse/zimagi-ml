@@ -235,44 +235,24 @@ class BaseRanker(object):
                 instance = self.instance_facade.retrieve_by_id(instance_id)
 
                 if instance:
-                    topic_score = 1
-                    print('')
-                    print('N===========================')
-                    instance_name = getattr(instance, self.instance_name_field).lower()
-                    print(instance_name)
-                    for keyword in self.keywords:
-                        count = instance_name.count(keyword)
-                        if count:
-                            print("{}: {}".format(keyword, count))
-                            topic_score += (100 * count)
-
-                    if getattr(instance, self.instance_text_field):
-                        print('')
-                        print('D=========================')
-                        instance_text = getattr(instance, self.instance_text_field).lower()
-                        for keyword in self.keywords:
-                            count = instance_text.count(keyword)
-                            if count:
-                                print("{}: {}".format(keyword, count))
-                                topic_score += (10 * count)
-
                     instance_data.scores[instance_id] = (
                         (instance_score / instance_data.counts[instance_id])
                         * (instance_data.counts[instance_id] / search_total)
-                        * topic_score
+                        * self._calculate_topic_score(instance)
                         * 100
                     )
                     self.instance_index[instance_id] = instance
 
                     if self.command.debug:
-                        self.command.info("({} / {}) * ({} / {}) * {} * 100 = {}  [ {} ]".format(
+                        self.command.info("({} / {}) * ({} / {}) * {} * 100 = {}  [ {} ]: {}".format(
                             round(instance_score, 2),
                             instance_data.counts[instance_id],
                             instance_data.counts[instance_id],
                             search_total,
                             topic_score,
                             round(instance_data.scores[instance_id], 2),
-                            instance_id
+                            instance_id,
+                            getattr(instance, self.instance_name_field)
                         ))
 
         elif instance_data.ids:
@@ -281,6 +261,25 @@ class BaseRanker(object):
                 instance_data.scores[instance_id] = -1
 
         return instance_data.scores
+
+
+    def _calculate_topic_score(self, instance):
+        topic_score = 1
+
+        instance_name = getattr(instance, self.instance_name_field).lower()
+        for keyword in self.keywords:
+            count = instance_name.count(keyword)
+            if count:
+                topic_score += (100 * count)
+
+        if getattr(instance, self.instance_text_field):
+            instance_text = getattr(instance, self.instance_text_field).lower()
+            for keyword in self.keywords:
+                count = instance_text.count(keyword)
+                if count:
+                    topic_score += (10 * count)
+
+        return topic_score
 
 
     def _filter_recommendations(self, scores, selectivity, search_limit):
