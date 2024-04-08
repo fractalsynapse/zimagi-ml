@@ -235,10 +235,12 @@ class BaseRanker(object):
                 instance = self.instance_facade.retrieve_by_id(instance_id)
 
                 if instance:
+                    topic_score = self._calculate_topic_score(instance)
+
                     instance_data.scores[instance_id] = (
                         (instance_score / instance_data.counts[instance_id])
                         * (instance_data.counts[instance_id] / search_total)
-                        * self._calculate_topic_score(instance)
+                        * topic_score
                         * 100
                     )
                     self.instance_index[instance_id] = instance
