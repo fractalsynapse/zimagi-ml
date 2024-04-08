@@ -17,6 +17,8 @@ class BaseRanker(object):
     ):
         self.command = command
 
+        self.keywords = []
+
         self.topics = TopicModel()
         self.topic_index = {}
         self.topic_mean = 0
@@ -29,6 +31,7 @@ class BaseRanker(object):
             'response_deadline__gte': self.command.time.now
         }
         self.instance_name_field = None
+        self.instance_text_field = None
         self.instance_id_field = None
         self.group_id_field = None
         self.instance_collection = None
@@ -99,6 +102,10 @@ class BaseRanker(object):
         search_text = None
 
         if focus_text:
+            for line in focus_text.lower().split("\n"):
+                for keyword in line.split(','):
+                    self.keywords.append(keyword.strip())
+
             search_text = self.command.generate_text_embeddings(focus_text, validate = False)
             if search_text:
                 search = copy.deepcopy(search_text)
@@ -231,20 +238,23 @@ class BaseRanker(object):
                     topic_score = 1
                     print('')
                     print('N===========================')
-                    print(instance.name)
-                    for topic, count in self.topics.get_index(instance.name).items():
-                        print("{}: {}".format(topic, count))
-                        if topic in self.topic_index:
-                            print(self.topic_index[topic])
-                            topic_score += (100 * count * self.topic_index[topic])
-                    if instance.description:
+                    instance_name = getattr(instance, self.instance_name_field).lower()
+                    print(instance_name)
+                    for keyword in self.keywords:
+                        count = instance_name.count(keyword)
+                        if count:
+                            print("{}: {}".format(keyword, count))
+                            topic_score += (100 * count)
+
+                    if getattr(instance, self.instance_text_field):
                         print('')
                         print('D=========================')
-                        for topic, count in self.topics.get_index(instance.description).items():
-                            print("{}: {}".format(topic, count))
-                            if topic in self.topic_index:
-                                print(self.topic_index[topic])
-                                topic_score += (count * self.topic_index[topic])
+                        instance_text = getattr(instance, self.instance_text_field).lower()
+                        for keyword in self.keywords:
+                            count = instance_text.count(keyword)
+                            if count:
+                                print("{}: {}".format(keyword, count))
+                                topic_score += count
 
                     instance_data.scores[instance_id] = (
                         (instance_score / instance_data.counts[instance_id])
