@@ -229,12 +229,22 @@ class BaseRanker(object):
 
                 if instance:
                     topic_score = 1
+                    print('')
+                    print('N===========================')
+                    print(instance.name)
                     for topic, count in self.topics.get_index(instance.name).items():
+                        print("{}: {}".format(topic, count))
                         if topic in self.topic_index:
+                            print(self.topic_index[topic])
                             topic_score += (100 * count * self.topic_index[topic])
                     if instance.description:
+                        print('')
+                        print('D=========================')
+                        print(instance.description)
                         for topic, count in self.topics.get_index(instance.description).items():
+                            print("{}: {}".format(topic, count))
                             if topic in self.topic_index:
+                                print(self.topic_index[topic])
                                 topic_score += (count * self.topic_index[topic])
 
                     instance_data.scores[instance_id] = (
