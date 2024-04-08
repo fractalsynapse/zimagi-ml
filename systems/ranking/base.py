@@ -258,6 +258,7 @@ class BaseRanker(object):
 
         elif instance_data.ids:
             for instance_id in instance_data.ids:
+                self.instance_index[instance_id] = self.instance_facade.retrieve_by_id(instance_id)
                 instance_data.scores[instance_id] = -1
 
         return instance_data.scores
