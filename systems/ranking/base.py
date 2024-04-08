@@ -58,16 +58,14 @@ class BaseRanker(object):
         search = self._generate_search(**options)
         if search:
             if search.text:
-                self.topic_index = self.topics.get_index(*search.text.sentences)
                 search = self._rank_sentences(
                     search, search.text,
                     focus_cutoff_score,
                     focus_selectivity,
                     focus_limit
                 )
-            else:
-                self.topic_index = self.topics.get_index(*search.sentences)
 
+            self.topic_index = self.topics.get_index(*search.sentences)
             if self.topic_index:
                 self.topic_mean = statistics.mean(self.topic_index.values())
 
@@ -175,7 +173,6 @@ class BaseRanker(object):
             counts = {},
             index = {}
         )
-
         if search:
             instance_rankings = self._search_embeddings(
                 self.instance_collection,
