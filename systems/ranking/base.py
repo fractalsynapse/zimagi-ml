@@ -254,7 +254,7 @@ class BaseRanker(object):
                             count = instance_text.count(keyword)
                             if count:
                                 print("{}: {}".format(keyword, count))
-                                topic_score += count
+                                topic_score += (10 * count)
 
                     instance_data.scores[instance_id] = (
                         (instance_score / instance_data.counts[instance_id])
