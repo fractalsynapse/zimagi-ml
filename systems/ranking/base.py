@@ -143,7 +143,7 @@ class BaseRanker(object):
             topics = list(self.topic_index.keys())
             filters = []
             for topic in topics:
-                filters.append(Q(**{ "{}__icontains".format(self.instance_name_field): topic }))
+                filters.append(Q(**{ "{}__iregex".format(self.document_instance_name_field): r"\y{}\y".format(topic) }))
             instance_query = instance_query.filter(reduce(or_, filters))
 
             instance_query = instance_query.filter(
