@@ -275,19 +275,29 @@ class BaseRanker(object):
     def _calculate_topic_score(self, instance):
         topic_score = 1
 
+        print('===========================')
+
         instance_name_words = self._get_words(getattr(instance, self.instance_name_field))
+        print(instance_name_words)
         for keyword in self.keywords:
+            print(keyword)
             count = self._count_keywords(keyword, instance_name_words)
+            print(count)
             if count:
                 topic_score += (1000 * count)
 
+        print('...........................')
         if getattr(instance, self.instance_text_field):
             instance_text_words = self._get_words(getattr(instance, self.instance_text_field))
+            print(instance_text_words)
             for keyword in self.keywords:
+                print(keyword)
                 count = self._count_keywords(keyword, instance_text_words)
+                print(count)
                 if count:
                     topic_score += (100 * count)
 
+        print('---------------------------')
         return topic_score
 
 
