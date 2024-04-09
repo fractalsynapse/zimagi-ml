@@ -84,6 +84,7 @@ class BaseRanker(object):
             for topic, count in self.topic_index.items():
                 self.command.data(topic, count)
 
+        print(self.keywords)
         for instance_id in self._filter(**options):
             instance = self.instance_facade.retrieve_by_id(instance_id)
             topic_score = self._calculate_topic_score(instance)
