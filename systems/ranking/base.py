@@ -86,7 +86,8 @@ class BaseRanker(object):
 
         for instance_id in self._filter(**options):
             instance = self.instance_facade.retrieve_by_id(instance_id)
-            print(instance.name)
+            topic_score = self._calculate_topic_score(instance)
+            print("{}: {}".format(instance.name, topic_score))
 
         raise Exception('STOP')
         return self._rank_instances(
