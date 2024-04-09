@@ -1,7 +1,4 @@
 from sklearn.metrics.pairwise import cosine_similarity
-from functools import reduce
-from operator import or_
-from django.db.models import Q
 
 from utility.data import Collection, ensure_list
 from utility.topics import TopicModel
@@ -140,14 +137,8 @@ class BaseRanker(object):
     def _filter_instances(self, **options):
         instance_query = self.instance_facade.filter(**self.instance_filters)
         if self.topic_index:
-            topics = list(self.topic_index.keys())
-            filters = []
-            for topic in topics:
-                filters.append(Q(**{ "{}__iregex".format(self.document_instance_name_field): r"\y{}\y".format(topic) }))
-            instance_query = instance_query.filter(reduce(or_, filters))
-
             instance_query = instance_query.filter(
-                **{ "{}__has_any_keys".format(self.instance_topics_field): topics }
+                **{ "{}__has_any_keys".format(self.instance_topics_field): list(self.topic_index.keys()) }
             )
         return instance_query
 
