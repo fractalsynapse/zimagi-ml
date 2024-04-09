@@ -84,6 +84,8 @@ class BaseRanker(object):
             for topic, count in self.topic_index.items():
                 self.command.data(topic, count)
 
+        print(self._filter(**options))
+        raise Exception('STOP')
         return self._rank_instances(
             search,
             instance_ids = self._filter(**options),
