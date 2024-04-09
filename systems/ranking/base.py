@@ -297,7 +297,7 @@ class BaseRanker(object):
             self.command.info('-' * self.command.display_width)
 
         for instance_id, score in sorted(scores.items(), key = lambda x: float(x[1]), reverse = True):
-            instance = self.instance_index[instance_id]
+            instance = self.instance_index.get(instance_id, None)
             if instance and score >= cutoff_score:
                 ranked_instances.append(Collection(
                     score = score,
