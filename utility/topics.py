@@ -42,7 +42,7 @@ class TopicModel(object):
         for token in parser:
             singular.append(str(token.lemma_).strip().lower())
 
-        return " ".join(singular)
+        return " ".join(singular).strip()
 
 
     def parse(self, text):
