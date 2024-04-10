@@ -35,6 +35,16 @@ class TopicModel(object):
         return { topic: count for topic, count in sorted(index.items(), key = lambda item: item[1], reverse = True) }
 
 
+    def get_singular(self, text):
+        parser = self.spacy(text)
+        singular = []
+
+        for token in parser:
+            singular.append(str(token.lemma_).strip().lower())
+
+        return " ".join(singular)
+
+
     def parse(self, text):
         if len(text) >= self.text_max_length:
             sentence_index = None
