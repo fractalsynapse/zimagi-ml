@@ -40,7 +40,8 @@ class TopicModel(object):
         singular = []
 
         for token in parser:
-            singular.append(str(token.lemma_).strip().lower())
+            if not token.is_punct:
+                singular.append(str(token.lemma_).strip().lower())
 
         return " ".join(singular).strip()
 
