@@ -79,4 +79,6 @@ class TopicModel(object):
             if topic and len(topic) < 4:
                 topics.append(" ".join([ word.strip() for word in topic ]).strip())
 
+            topics.append(str(chunk.root.lemma_).strip().lower())
+
         return topics
