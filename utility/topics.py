@@ -66,19 +66,29 @@ class TopicModel(object):
         parser = self.spacy(text)
         topics = []
 
+        invalid_chars = r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)'
+        word_types = ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']
+
         for chunk in parser.noun_chunks:
             topic = []
             for index, word in enumerate(chunk):
                 if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
                     and not word.is_punct \
                     and len(str(word)) > 1 \
-                    and not bool(re.search(r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)', str(word))) \
-                    and word.pos_ not in ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']:
+                    and not bool(re.search(invalid_chars, str(word))) \
+                    and word.pos_ not in word_types:
                     topic.append(str(word.lemma_).strip().lower())
 
-            if topic and len(topic) < 4:
-                topics.append(" ".join([ word.strip() for word in topic ]).strip())
+            if topic:
+                topic_phrase = " ".join([ word.strip() for word in topic ]).strip()
+                if len(topic) < 4:
+                    topics.append(topic_phrase)
 
-            topics.append(str(chunk.root.lemma_).strip().lower())
+                if str(chunk.root) not in stop_words.STOP_WORDS \
+                    and not bool(re.search(invalid_chars, str(chunk.root))) \
+                    and chunk.root.pos_ not in word_types:
+                    root_topic = str(chunk.root.lemma_).strip().lower()
+                    if root_topic != topic_phrase:
+                        topics.append(str(chunk.root.lemma_).strip().lower())
 
         return topics
