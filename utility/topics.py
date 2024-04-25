@@ -8,6 +8,9 @@ class TopicModel(object):
 
     text_max_length = 100000
 
+    invalid_chars = r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)'
+    word_types = ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']
+
 
     def __init__(self):
         self.spacy = spacy.load('en_core_web_lg')
@@ -66,17 +69,14 @@ class TopicModel(object):
         parser = self.spacy(text)
         topics = []
 
-        invalid_chars = r'([^\x00-\x7F]|\d+|\'|\"|\?|\(|\)|\[|\]|\||\=|\.)'
-        word_types = ['PRON', 'ADP', 'ADV', 'VERB', 'DET', 'CCONJ', 'SCONJ']
-
         for chunk in parser.noun_chunks:
             topic = []
             for index, word in enumerate(chunk):
                 if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
                     and not word.is_punct \
                     and len(str(word)) > 1 \
-                    and not bool(re.search(invalid_chars, str(word))) \
-                    and word.pos_ not in word_types:
+                    and not bool(re.search(self.invalid_chars, str(word))) \
+                    and word.pos_ not in self.word_types:
                     topic.append(str(word.lemma_).strip().lower())
 
             if topic:
@@ -85,8 +85,8 @@ class TopicModel(object):
                     topics.append(topic_phrase)
 
                 if str(chunk.root) not in stop_words.STOP_WORDS \
-                    and not bool(re.search(invalid_chars, str(chunk.root))) \
-                    and chunk.root.pos_ not in word_types:
+                    and not bool(re.search(self.invalid_chars, str(chunk.root))) \
+                    and chunk.root.pos_ not in self.word_types:
                     root_topic = str(chunk.root.lemma_).strip().lower()
                     if root_topic != topic_phrase:
                         topics.append(str(chunk.root.lemma_).strip().lower())
