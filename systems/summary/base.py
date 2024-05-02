@@ -31,9 +31,11 @@ class BaseModelSummarizer(object):
 
         self.document_facade = Model(document_facade).facade if document_facade else None
         self.document_filters = {}
+        self.document_group_field = None
 
         self.embedding_collection = None
         self.embedding_id_field = self.instance.facade.pk
+        self.embedding_group_field = self.instance.facade.pk
 
 
     def _get_text_chunks(self, text, prompt, max_chunks):
@@ -99,15 +101,16 @@ class BaseModelSummarizer(object):
             document_rankings = self.command.search_embeddings(self.embedding_collection,
                 search.embeddings,
                 limit = sentence_limit,
-                fields = [ 'document_id' ],
+                fields = [ self.embedding_group_field ],
                 filter_field = self.embedding_id_field,
-                filter_ids = self.instance.id
+                filter_ids = self.instance.id,
+                min_score = 0
             )
             for index, ranking in enumerate(document_rankings):
                 for ranking_index, sentence_info in enumerate(ranking):
                     sentence = sentence_info.payload['sentence'].strip()
-                    if 'document_id' in sentence_info.payload:
-                        document_id = sentence_info.payload['document_id']
+                    if self.embedding_group_field in sentence_info.payload:
+                        document_id = sentence_info.payload[self.embedding_group_field]
 
                         if document_id not in document_scores:
                             if document_id not in document_failed:
@@ -145,7 +148,7 @@ class BaseModelSummarizer(object):
                 document = documents[document_id]
                 completed = False
 
-                if document_sentences[document_id] and document.name not in document_index:
+                if document_sentences[document_id] and (not self.document_group_field or getattr(document, self.document_group_field) not in document_index):
                     for section_index, section in enumerate(self.parse_sections(document, document_sentences[document_id])):
                         if len(chunks) < max_chunks:
                             chunks.append(section)
@@ -154,7 +157,9 @@ class BaseModelSummarizer(object):
                             break
 
                     ranked_documents["{:07.3f}:{}".format(score, document.id)] = document
-                    document_index[document.name] = True
+                    if self.document_group_field:
+                        document_index[getattr(document, self.document_group_field)] = True
+
                     if completed:
                         break
 
@@ -167,15 +172,12 @@ class BaseModelSummarizer(object):
         sections = []
 
         if document.text and not document.sentences:
-            document.sentences = [
-                re.sub(r'\s+', ' ', sentence)
-                for sentence in self.command.parse_sentences(document.text, validate = False)
-            ] if document.text else []
+            document.sentences = self.command.parse_sentences(document.text, validate = False) if document.text else []
             document.save()
 
         for sentence in set(sentences):
-            sentence = re.sub(r'\s+', ' ', sentence)
             sentence_tokens = self.summarizer.get_token_count(sentence)
+
             try:
                 sentence_index = document.sentences.index(sentence)
 
@@ -207,7 +209,7 @@ class BaseModelSummarizer(object):
                     sentence_map[after_index] = next_sentence
 
                 # Find similarity around context
-                if self.command.debug and self.command.verbosity == 3:
+                if self.command.debug:
                     self.command.info('=' * self.command.display_width)
                     self.command.info('')
                     self.command.info('-------------------------------')
@@ -227,11 +229,11 @@ class BaseModelSummarizer(object):
                     if len(previous_similarities) > 1:
                         cutoff_score = max(statistics.mean(previous_similarities) + (selectivity * statistics.stdev(previous_similarities)), 0)
 
-                    if self.command.debug and self.command.verbosity == 3:
+                    if self.command.debug:
                         self.command.info('')
-                        self.command.info('-------------------------------')
+                        self.command.info('--------------------------------')
                         self.command.info('Processing Previous Similarities')
-                        self.command.info('-------------------------------')
+                        self.command.info('--------------------------------')
                         self.command.data('Cutoff', cutoff_score)
 
                     for index, sentence in enumerate(before_context):
@@ -240,7 +242,7 @@ class BaseModelSummarizer(object):
                             del before_context[index:]
                             break
 
-                        if self.command.debug and self.command.verbosity == 3:
+                        if self.command.debug:
                             self.command.data(score, sentence)
 
                         sentence_map[(sentence_index - index - 1)] = sentence
@@ -254,7 +256,7 @@ class BaseModelSummarizer(object):
                     if len(next_similarities) > 1:
                         cutoff_score = max(statistics.mean(next_similarities) + (selectivity * statistics.stdev(next_similarities)), 0)
 
-                    if self.command.debug and self.command.verbosity == 3:
+                    if self.command.debug:
                         self.command.info('')
                         self.command.info('-------------------------------')
                         self.command.info('Processing Next Similarities')
@@ -267,7 +269,7 @@ class BaseModelSummarizer(object):
                             del after_context[index:]
                             break
 
-                        if self.command.debug and self.command.verbosity == 3:
+                        if self.command.debug:
                             self.command.data(score, sentence)
 
                         sentence_map[(sentence_index + index + 1)] = sentence
@@ -285,7 +287,11 @@ class BaseModelSummarizer(object):
                 # New section
                 if previous_index:
                     sections.append("\n".join(section))
-                section = [ "The following is an excerpt from document '{}' to be used for summarization and answering questions:\n\n".format(document.name), sentence ]
+
+                section = [ "The following is an excerpt from document '{}' to be used for summarization and answering questions:\n\n".format(
+                    getattr(document, self.document_group_field)),
+                    sentence
+                ]
             else:
                 # Continue section
                 section.append(sentence)
@@ -306,6 +312,7 @@ Extract only the relevant information from the provided text for the following r
 
 If there is no directly relevant information in the provided text answer simply with "No information available".
 """.format(prompt)
+
             _request_tokens = self.summarizer.get_token_count(info['text'])
             _summary_text = self.command.generate_summary(info['text'], prompt = _sub_prompt, **config)
             _response_tokens = self.summarizer.get_token_count(_summary_text)
