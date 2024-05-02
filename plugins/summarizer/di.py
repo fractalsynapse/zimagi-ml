@@ -42,9 +42,6 @@ class Provider(BaseProvider('summarizer', 'di')):
 
 
     def _run_inference(self, **config):
-        import json
-        print(json.dumps(config, indent=2))
-
         response = requests.post(
             "https://api.deepinfra.com/v1/inference/{}".format(self._get_model_name()),
             headers = {
