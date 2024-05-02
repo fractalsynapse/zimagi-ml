@@ -31,6 +31,4 @@ Do not include external links.
         ).strip()
 
     def _parse_summary_response(self, summary):
-        print('Summary response')
-        print(summary.strip())
         return summary.strip().strip("\'\"")
