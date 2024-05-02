@@ -1,7 +1,7 @@
 from systems.plugins.index import ProviderMixin
 
 
-class Llama2SummaryMixin(ProviderMixin('llama2_summary')):
+class LlamaSummaryMixin(ProviderMixin('llama_summary')):
 
     def _get_prompt(self, text, prompt = '', persona = '', output_format = ''):
         return """
@@ -27,7 +27,7 @@ Do not include external links.
             instruction = prompt.strip(),
             text = text.strip(),
             output_format = output_format.strip()
-        )
+        ).strip()
 
     def _parse_summary_response(self, summary):
         return summary.strip()

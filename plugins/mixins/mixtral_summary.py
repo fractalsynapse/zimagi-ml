@@ -10,6 +10,7 @@ class MixtralSummaryMixin(ProviderMixin('mixtral_summary')):
 You always produce factually correct information from the text provided.
 You do not ask questions.
 <</SYS>>
+
 Refer exclusively to the following text for further questions and instructions:
 
 {text}
@@ -27,7 +28,9 @@ Do not include external links.
             instruction = prompt.strip(),
             text = text.strip(),
             output_format = output_format.strip()
-        )
+        ).strip()
 
     def _parse_summary_response(self, summary):
+        print('Summary response')
+        print(summary.strip())
         return summary.strip().strip("\'\"")

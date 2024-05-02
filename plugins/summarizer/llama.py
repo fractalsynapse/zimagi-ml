@@ -6,7 +6,7 @@ import re
 import torch
 
 
-class Provider(BaseProvider('summarizer', 'llama2')):
+class Provider(BaseProvider('summarizer', 'llama')):
 
     @classmethod
     def _get_pipeline(cls, instance):

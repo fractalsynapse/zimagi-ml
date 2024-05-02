@@ -42,6 +42,9 @@ class Provider(BaseProvider('summarizer', 'di')):
 
 
     def _run_inference(self, **config):
+        import json
+        print(json.dumps(config, indent=2))
+
         response = requests.post(
             "https://api.deepinfra.com/v1/inference/{}".format(self._get_model_name()),
             headers = {
@@ -73,7 +76,7 @@ class Provider(BaseProvider('summarizer', 'di')):
             max_new_tokens = self.get_max_new_tokens(),
             temperature = config.get('temperature', 0.1), # 0.01 - 100
             top_p = config.get('top_p', 0.9), # 0 - 1
-            repetition_penalty = config.get('repetition_penalty', 0.1) # 0.01 - 5
+            repetition_penalty = config.get('repetition_penalty', 0.9) # 0.01 - 5
         )
         return self._parse_summary_response(
             results[0]['generated_text'].strip()
