@@ -109,6 +109,7 @@ class MLCommandMixin(CommandMixin('ml')):
         summary_prompt = config.get('prompt', '')
         summary_persona = config.get('persona', '')
         summary_format = config.get('format', '')
+        summary_retries = config.get('retries', 5)
         summary_config = {
             key: value for key, value in config.items()
             if key not in [ 'persona', 'prompt', 'format' ]
@@ -134,10 +135,16 @@ class MLCommandMixin(CommandMixin('ml')):
                 self.info("\n")
                 self.info('-' * self.display_width)
 
-            result = self.submit('agent:model:summary', {
-                'text': text,
-                'config': config
-            })
+            for index in range(summary_retries):
+                result = self.submit('agent:model:summary', {
+                    'text': text,
+                    'config': config
+                }).strip()
+                if result and result[-1] in [ '.', '?', '!' ]:
+                    break
+                else:
+                    result = 'Summary generation was unsuccessful'
+
             if self.debug and self.verbosity == 3:
                 self.info("\n")
                 self.info(result)
