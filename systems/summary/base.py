@@ -310,7 +310,7 @@ class BaseModelSummarizer(object):
             _sub_prompt = """
 Extract only the relevant information from the provided text for the following request: {}
 
-If there is no directly relevant information in the provided text answer simply with "No information available".
+If there is no directly relevant information in the provided text answer only with "No information available".
 """.format(prompt)
 
             _request_tokens = self.summarizer.get_token_count(info['text'])
