@@ -23,6 +23,8 @@ models:
                 type: text
             format:
                 type: text
+            endings:
+                type: list
             config:
                 type: dict
             result:

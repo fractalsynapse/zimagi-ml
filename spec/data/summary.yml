@@ -52,27 +52,6 @@ data:
       - data-auditor
     fields:
       name: null
-      text:
-        type: '@django.TextField'
-        options:
-          'null': true
-          default: null
-          editable: true
-          system: false
-      format:
-        type: '@django.TextField'
-        options:
-          'null': true
-          default: null
-          editable: true
-          system: false
-      result:
-        type: '@django.TextField'
-        options:
-          'null': true
-          default: null
-          editable: true
-          system: false
       persona:
         type: '@django.TextField'
         options:
@@ -87,6 +66,33 @@ data:
           editable: true
           system: false
       prompt:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      endings:
+        type: '@zimagi.ListField'
+        color: json
+        options:
+          editable: true
+          system: false
+      format:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      text:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      result:
         type: '@django.TextField'
         options:
           'null': true

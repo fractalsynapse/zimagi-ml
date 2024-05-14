@@ -1,11 +1,22 @@
 from django.conf import settings
 
 from systems.commands.index import CommandMixin
-from utility.data import Collection, get_identifier, dump_json
+from utility.data import Collection, get_identifier, dump_json, ensure_list
 from utility.web import WebParser
 
 import billiard as multiprocessing
 import re
+
+
+def check_ending(text, endings):
+    if not endings:
+        return True
+
+    text = text.strip()
+    for ending in endings:
+        if text.endswith(ending):
+            return True
+    return False
 
 
 class MLCommandMixin(CommandMixin('ml')):
@@ -106,13 +117,16 @@ class MLCommandMixin(CommandMixin('ml')):
         if not text:
             return ''
 
-        summary_prompt = config.get('prompt', '')
+        summarizer = self.get_summarizer(init = False)
+
         summary_persona = config.get('persona', '')
+        summary_prompt = config.get('prompt', '')
         summary_format = config.get('format', '')
         summary_retries = config.get('retries', 5)
+        summary_endings = ensure_list(config.get('endings', [ '.', '?', '!' ]))
         summary_config = {
             key: value for key, value in config.items()
-            if key not in [ 'persona', 'prompt', 'format' ]
+            if key not in [ 'persona', 'prompt', 'format', 'retries', 'endings' ]
         }
         summary_id = get_identifier([
             text, summary_prompt, summary_persona, summary_format, summary_config
@@ -124,7 +138,11 @@ class MLCommandMixin(CommandMixin('ml')):
             summary.persona = summary_persona
             summary.prompt = summary_prompt
             summary.format = summary_format
+            summary.endings = summary_endings
             summary.config = summary_config
+
+            request_tokens = 0
+            response_tokens = 0
 
             if self.debug and self.verbosity == 3:
                 self.notice('Generating summary')
@@ -136,14 +154,20 @@ class MLCommandMixin(CommandMixin('ml')):
                 self.info('-' * self.display_width)
 
             for index in range(summary_retries):
+                request_tokens += 250 + summarizer.get_token_count(
+                    "\n\n\n".join([ text, summary_persona, summary_prompt, summary_format ])
+                )
                 result = self.submit('agent:model:summary', {
                     'text': text,
                     'config': config
                 }).strip()
-                if result and result[-1] in [ '.', '?', '!' ]:
+
+                response_tokens += summarizer.get_token_count(result)
+
+                if result and check_ending(result, summary_endings):
                     break
                 else:
-                    result = 'Summary generation was unsuccessful'
+                    result = 'Summary generation was unsuccessful. Please retry with a modified question.'
 
             if self.debug and self.verbosity == 3:
                 self.info("\n")
@@ -151,7 +175,7 @@ class MLCommandMixin(CommandMixin('ml')):
 
             summary.result = result
             summary.save()
-            return result
+            return result, request_tokens, response_tokens
 
         return self.run_exclusive("ml-summary-{}".format(summary_id), generate)
 

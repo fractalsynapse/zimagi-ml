@@ -38,14 +38,18 @@ class TextSummarizer(object):
         return chunks
 
 
-    def generate(self, prompt, output_format = '', **config):
+    def generate(self, prompt, output_format = '', output_endings = None, **config):
+        if output_endings is None:
+            output_endings = [ '.', '?', '!' ]
+
         max_chunks = config.pop('max_chunks', 0)
 
         def generate_summary(info):
-            _request_tokens = self.summarizer.get_token_count(info['text'])
-            _summary_text = self.command.generate_summary(info['text'], prompt = prompt, **config)
-            _response_tokens = self.summarizer.get_token_count(_summary_text)
-
+            _summary_text, _request_tokens, _response_tokens = self.command.generate_summary(
+                info['text'],
+                prompt = prompt,
+                **config
+            )
             if self.command.verbosity == 3:
                 self.command.notice(
 """
@@ -93,13 +97,15 @@ Response Tokens: {}
                     _request_tokens += _final_request_tokens
                     _response_tokens += _final_response_tokens
                 else:
-                    _request_tokens += self.summarizer.get_token_count(_chunks[0]['text'])
-                    _summary_text = self.command.generate_summary(_chunks[0]['text'],
+                    _summary_text, _sub_request_tokens, _sub_response_tokens = self.command.generate_summary(
+                        _chunks[0]['text'],
                         prompt = prompt,
                         format = output_format,
+                        endings = output_endings,
                         **config
                     )
-                    _response_tokens += self.summarizer.get_token_count(_summary_text)
+                    _request_tokens += _sub_request_tokens
+                    _response_tokens += _sub_response_tokens
 
                     if self.command.verbosity == 3:
                         self.command.notice(

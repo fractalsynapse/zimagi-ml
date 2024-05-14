@@ -304,19 +304,22 @@ class BaseModelSummarizer(object):
         return sections
 
 
-    def generate(self, prompt, search_prompt = None, output_format = '', max_chunks = 10, include_files = True, sentence_limit = 50, **config):
+    def generate(self, prompt, search_prompt = None, output_format = '', output_endings = None, max_chunks = 10, include_files = True, sentence_limit = 50, **config):
+        if output_endings is None:
+            output_endings = [ '.', '?', '!' ]
 
         def generate_summary(info):
             _sub_prompt = """
 Extract only the relevant information from the provided text for the following request: {}
 
-If there is no directly relevant information in the provided text answer only with "No information available".
+If there is no directly relevant information in the provided text include the phrase "No information available".
 """.format(prompt)
 
-            _request_tokens = self.summarizer.get_token_count(info['text'])
-            _summary_text = self.command.generate_summary(info['text'], prompt = _sub_prompt, **config)
-            _response_tokens = self.summarizer.get_token_count(_summary_text)
-
+            _summary_text, _request_tokens, _response_tokens = self.command.generate_summary(
+                info['text'],
+                prompt = _sub_prompt,
+                **config
+            )
             if self.command.debug:
                 self.command.notice(
 """
@@ -360,10 +363,11 @@ Response Tokens: {}
                     _results = self.command.run_list(_chunks, generate_summary)
                     _chunk_text = {}
                     for _chunk in _results.data:
+                        _request_tokens += _chunk.result['request_tokens']
+                        _response_tokens += _chunk.result['response_tokens']
+
                         if not re.search(r'No information[a-z\s]+available', _chunk.result['text']):
                             _chunk_text[_chunk.result['index']] = _chunk.result['text']
-                            _request_tokens += _chunk.result['request_tokens']
-                            _response_tokens += _chunk.result['response_tokens']
 
                     _summary_text, _final_request_tokens, _final_response_tokens, _chunk_documents = summarize(
                         "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
@@ -372,13 +376,15 @@ Response Tokens: {}
                     _response_tokens += _final_response_tokens
                     _documents = { **_documents, **_chunk_documents }
                 else:
-                    _request_tokens += self.summarizer.get_token_count(_chunks[0]['text'])
-                    _summary_text = self.command.generate_summary(_chunks[0]['text'],
+                    _summary_text, _sub_request_tokens, _sub_response_tokens = self.command.generate_summary(
+                        _chunks[0]['text'],
                         prompt = prompt,
                         format = output_format,
+                        endings = output_endings,
                         **config
                     )
-                    _response_tokens += self.summarizer.get_token_count(_summary_text)
+                    _request_tokens += _sub_request_tokens
+                    _response_tokens += _sub_response_tokens
 
                     if self.command.debug:
                         self.command.notice(
