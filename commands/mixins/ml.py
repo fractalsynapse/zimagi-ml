@@ -100,11 +100,13 @@ class MLCommandMixin(CommandMixin('ml')):
 
 
     def get_summarizer(self, **options):
+        providers = options.get('providers', settings.SUMMARIZER_PROVIDERS)
+
         with self.provider_lock:
             if not getattr(self, 'providers', None):
                 self.providers = []
 
-            provider = self._get_model_provider('summarizer', settings.SUMMARIZER_PROVIDERS, options)
+            provider = self._get_model_provider('summarizer', providers, options)
             self._add_model(
                 provider.provider_type,
                 provider.name,
@@ -117,8 +119,10 @@ class MLCommandMixin(CommandMixin('ml')):
         if not text:
             return ''
 
-        summarizer = self.get_summarizer(init = False)
+        summary_providers = config.pop('providers', settings.SUMMARIZER_PROVIDERS)
+        summarizer = self.get_summarizer(init = False, providers = summary_providers)
 
+        summary_channel = config.pop('channel', 'agent:model:summary')
         summary_persona = config.get('persona', '')
         summary_prompt = config.get('prompt', '')
         summary_format = config.get('format', '')
@@ -157,7 +161,7 @@ class MLCommandMixin(CommandMixin('ml')):
                 request_tokens += 250 + summarizer.get_token_count(
                     "\n\n\n".join([ text, summary_persona, summary_prompt, summary_format ])
                 )
-                result = self.submit('agent:model:summary', {
+                result = self.submit(summary_channel, {
                     'text': text,
                     'config': config
                 }).strip()
@@ -177,7 +181,34 @@ class MLCommandMixin(CommandMixin('ml')):
             summary.save()
             return result, request_tokens, response_tokens
 
-        return self.run_exclusive("ml-summary-{}".format(summary_id), generate)
+        return self.run_exclusive("ml:{}:{}".format(summary_channel, summary_id), generate)
+
+
+    def exec_summary(self, provider, channel):
+        summarizer = self.get_summarizer(providers = [ provider ])
+
+        def parse_model_summary(text, config):
+            return summarizer.summarize(text, **config)
+
+        for package in self.listen(channel, state_key = "model_{}".format(provider)):
+            text = package.message['text']
+            config = package.message.get('config', {})
+
+            try:
+                self.data("Processing {} request".format(provider), package.sender)
+                response = self.profile(parse_model_summary, text, config)
+                self.send(package.sender, response.result)
+
+            except Exception as e:
+                self.send(channel, package.message, package.sender)
+                raise e
+
+            self.send("{}:stats".format(channel), {
+                'provider': summarizer.name,
+                'time': response.time,
+                'memory': response.memory,
+                'length': len(text)
+            })
 
 
     def shutdown(self):
