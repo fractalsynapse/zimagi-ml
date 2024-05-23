@@ -2,7 +2,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from django.conf import settings
 
 from systems.models.index import Model
-from utility.data import Collection
+from utility.data import Collection, ensure_list
 
 import time
 import re
@@ -16,11 +16,14 @@ class BaseModelSummarizer(object):
         command,
         instance,
         text_facade = None,
-        document_facade = None
+        document_facade = None,
+        provider = None
     ):
         self.command = command
         self.instance = instance
-        self.summarizer = self.command.get_summarizer(init = False)
+
+        self.provider = provider
+        self.summarizer = self.command.get_summarizer(init = False, provider = self.provider)
 
         self.text_facade = Model(text_facade).facade if text_facade else None
         self.instance_order = 'created'
@@ -318,6 +321,7 @@ If there is no directly relevant information in the provided text include the ph
             _summary_text, _request_tokens, _response_tokens = self.command.generate_summary(
                 info['text'],
                 prompt = _sub_prompt,
+                provider = self.provider,
                 **config
             )
             if self.command.debug:
@@ -381,6 +385,7 @@ Response Tokens: {}
                         prompt = prompt,
                         format = output_format,
                         endings = output_endings,
+                        provider = self.provider,
                         **config
                     )
                     _request_tokens += _sub_request_tokens

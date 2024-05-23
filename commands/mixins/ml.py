@@ -100,29 +100,32 @@ class MLCommandMixin(CommandMixin('ml')):
 
 
     def get_summarizer(self, **options):
-        providers = options.get('providers', settings.SUMMARIZER_PROVIDERS)
+        provider = options.get('provider', None)
+        if not provider:
+            provider = settings.SUMMARIZER_PROVIDERS
 
         with self.provider_lock:
             if not getattr(self, 'providers', None):
                 self.providers = []
 
-            provider = self._get_model_provider('summarizer', providers, options)
+            provider = self._get_model_provider('summarizer', ensure_list(provider), options)
             self._add_model(
                 provider.provider_type,
                 provider.name,
                 provider.field_device
             )
             self.providers.append(provider)
+
         return provider
 
     def generate_summary(self, text, **config):
         if not text:
-            return ''
+            return '', 0, 0
 
-        summary_providers = config.pop('providers', settings.SUMMARIZER_PROVIDERS)
-        summarizer = self.get_summarizer(init = False, providers = summary_providers)
+        summary_provider = config.get('provider', None)
+        summarizer = self.get_summarizer(init = False, provider = summary_provider)
 
-        summary_channel = config.pop('channel', 'agent:model:summary')
+        summary_channel = "agent:model:{}".format(summary_provider if summary_provider else 'summary')
         summary_persona = config.get('persona', '')
         summary_prompt = config.get('prompt', '')
         summary_format = config.get('format', '')
@@ -184,26 +187,28 @@ class MLCommandMixin(CommandMixin('ml')):
         return self.run_exclusive("ml:{}:{}".format(summary_channel, summary_id), generate)
 
 
-    def exec_summary(self, provider, channel):
-        summarizer = self.get_summarizer(providers = [ provider ])
+    def exec_summary(self, provider = None):
+        summarizer = self.get_summarizer(provider = provider)
+        summary_key = provider if provider else 'summary'
+        summary_channel = "agent:model:{}".format(summary_key)
 
         def parse_model_summary(text, config):
             return summarizer.summarize(text, **config)
 
-        for package in self.listen(channel, state_key = "model_{}".format(provider)):
+        for package in self.listen(summary_channel, state_key = "model_{}".format(summary_key)):
             text = package.message['text']
             config = package.message.get('config', {})
 
             try:
-                self.data("Processing {} request".format(provider), package.sender)
+                self.data("Processing {} request".format(summary_key), package.sender)
                 response = self.profile(parse_model_summary, text, config)
                 self.send(package.sender, response.result)
 
             except Exception as e:
-                self.send(channel, package.message, package.sender)
+                self.send(summary_channel, package.message, package.sender)
                 raise e
 
-            self.send("{}:stats".format(channel), {
+            self.send("{}:stats".format(summary_channel), {
                 'provider': summarizer.name,
                 'time': response.time,
                 'memory': response.memory,

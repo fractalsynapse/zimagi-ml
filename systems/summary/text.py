@@ -1,16 +1,18 @@
 from django.conf import settings
 
-from utility.data import Collection
+from utility.data import Collection, ensure_list
 
 import time
 
 
 class TextSummarizer(object):
 
-    def __init__(self, command, text):
+    def __init__(self, command, text, provider = None):
         self.command = command
         self.text = text.strip()
-        self.summarizer = self.command.get_summarizer(init = False)
+
+        self.provider = provider
+        self.summarizer = self.command.get_summarizer(init = False, provider = self.provider)
 
 
     def _get_chunks(self, text, prompt, max_chunks = 0):
@@ -48,6 +50,7 @@ class TextSummarizer(object):
             _summary_text, _request_tokens, _response_tokens = self.command.generate_summary(
                 info['text'],
                 prompt = prompt,
+                provider = self.provider,
                 **config
             )
             if self.command.verbosity == 3:
@@ -102,6 +105,7 @@ Response Tokens: {}
                         prompt = prompt,
                         format = output_format,
                         endings = output_endings,
+                        provider = self.provider,
                         **config
                     )
                     _request_tokens += _sub_request_tokens
