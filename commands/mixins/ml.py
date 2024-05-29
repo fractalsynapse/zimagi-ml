@@ -119,9 +119,6 @@ class MLCommandMixin(CommandMixin('ml')):
         return provider
 
     def generate_summary(self, text, **config):
-        if not text:
-            return '', 0, 0
-
         summary_provider = config.get('provider', None)
         summarizer = self.get_summarizer(init = False, provider = summary_provider)
 
