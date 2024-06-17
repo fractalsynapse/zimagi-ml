@@ -138,7 +138,7 @@ class BaseModelSummarizer(object):
                     limit = sentence_limit,
                     fields = [ 'order', 'topics' ],
                     filter_field = self.embedding_id_field,
-                    filter_ids = list(document_topic_scores.keys()),
+                    filter_ids = self.instance.id,
                     min_score = min_score
                 )
                 for index, ranking in enumerate(document_rankings):
@@ -177,7 +177,7 @@ class BaseModelSummarizer(object):
                     document_scores[document_id] = (
                         (document_score / total_sentences) # 0 - 1
                         * (len(document_sentences[document_id]) / total_sentences) # 0 - 1
-                        * document_topic_scores[document_id] # >= 1
+                        * document_topic_scores.get(document_id, 1) # >= 1
                     )
 
             if documents:
