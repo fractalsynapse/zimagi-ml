@@ -71,24 +71,37 @@ class TopicModel(object):
 
         for chunk in parser.noun_chunks:
             topic = []
+            plural = []
+
             for index, word in enumerate(chunk):
                 if (index > 0 or str(word) not in stop_words.STOP_WORDS) \
                     and not word.is_punct \
                     and len(str(word)) > 1 \
                     and not bool(re.search(self.invalid_chars, str(word))) \
                     and word.pos_ not in self.word_types:
+
                     topic.append(str(word.lemma_).strip().lower())
+                    plural.append(str(word).strip().lower())
 
             if topic:
                 topic_phrase = " ".join([ word.strip() for word in topic ]).strip()
+                plural_phrase = " ".join([ word.strip() for word in plural ]).strip()
+
                 if len(topic) < 4:
                     topics.append(topic_phrase)
+                    if topic_phrase != plural_phrase:
+                        topics.append(plural_phrase)
 
                 if str(chunk.root) not in stop_words.STOP_WORDS \
                     and not bool(re.search(self.invalid_chars, str(chunk.root))) \
                     and chunk.root.pos_ not in self.word_types:
+
                     root_topic = str(chunk.root.lemma_).strip().lower()
+                    plural_root_topic = str(chunk.root).strip().lower()
+
                     if root_topic != topic_phrase:
-                        topics.append(str(chunk.root.lemma_).strip().lower())
+                        topics.append(root_topic)
+                        if root_topic != plural_root_topic:
+                            topics.append(plural_root_topic)
 
         return topics
