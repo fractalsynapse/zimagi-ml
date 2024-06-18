@@ -17,6 +17,33 @@ class TopicModel(object):
         self.spacy.max_length = self.text_max_length
 
 
+    def get_topic_score(self, search_topics, *topic_args):
+        topic_map = {}
+
+        def increment_topic(topic, count = 1):
+            if topic not in topic_map:
+                topic_map[topic] = count
+            else:
+                topic_map[topic] += count
+
+        for topics in topic_args:
+            if isinstance(topics, list):
+                for topic in topics:
+                    increment_topic(topic)
+            elif isinstance(topics, dict):
+                for key, value in topics.items():
+                    increment_topic(key, value)
+
+        topic_score = 0
+        for topic in search_topics:
+            for doc_topic in topic_map.keys():
+                char_similarity = (len(topic) / len(doc_topic)) if topic in doc_topic else 0
+                if char_similarity >= 0.8:
+                    topic_score += topic_map[doc_topic]
+
+        return topic_score
+
+
     def filtered_index(self, full_texts, context_texts):
         context_index = self.get_index(*context_texts)
         index = {}
