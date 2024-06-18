@@ -1,4 +1,3 @@
-from sklearn.metrics.pairwise import cosine_similarity
 from django.conf import settings
 
 from systems.models.index import Model
@@ -37,10 +36,9 @@ class BaseModelSummarizer(object):
         self.document_facade = Model(document_facade).facade if document_facade else None
         self.document_filters = {}
         self.document_id_field = None
-        self.document_group_field = None
 
         self.embedding_collection = None
-        self.embedding_id_field = None
+        self.embedding_id_field = self.instance.facade.pk
 
 
     def _get_text_chunks(self, text, prompt, max_chunks):
@@ -71,7 +69,6 @@ class BaseModelSummarizer(object):
     def _get_chunks(self, prompt, max_chunks, search_prompt = None, user_prompt = None, include_files = True, sentence_limit = 50, min_score = 0):
         documents = {}
         ranked_documents = {}
-        document_index = {}
         document_scores = {}
         document_failed = {}
 
@@ -79,23 +76,6 @@ class BaseModelSummarizer(object):
 
         if not search_prompt:
             search_prompt = prompt
-
-        def get_topic_score(search_topics, topic_index):
-            if isinstance(topic_index, list):
-                topic_map = {}
-                for topic in topic_index:
-                    if topic not in topic_map:
-                        topic_map[topic] = 1
-                    else:
-                        topic_map[topic] += 1
-                topic_index = topic_map
-
-            topic_score = 0
-            for topic in search_topics:
-                for doc_topic in topic_index.keys():
-                    if re.search(r"\b{}\b".format(topic), doc_topic):
-                        topic_score += topic_index[doc_topic]
-            return topic_score
 
         # Get text chunks
         if self.text_facade and self.text_field:
@@ -127,7 +107,12 @@ class BaseModelSummarizer(object):
                 self.document_id_field: self.instance.id
             })
             for document in document_results:
-                topic_score = get_topic_score(search_topics, document.topics)
+                topic_score = self.topics.get_topic_score(search_topics, document.topics)
+
+                if document.description:
+                    description_topics = self.topics.parse(document.description)
+                    topic_score += self.topics.get_topic_score(search_topics, description_topics)
+
                 if topic_score:
                     document_topic_scores[document.id] = topic_score
 
@@ -138,14 +123,14 @@ class BaseModelSummarizer(object):
                     limit = sentence_limit,
                     fields = [ 'order', 'topics' ],
                     filter_field = self.embedding_id_field,
-                    filter_ids = self.instance.id,
+                    filter_ids = list(document_topic_scores.keys()),
                     min_score = min_score
                 )
                 for index, ranking in enumerate(document_rankings):
                     for ranking_index, sentence_info in enumerate(ranking):
                         sentence = sentence_info.payload['sentence'].strip()
                         document_id = sentence_info.payload[self.embedding_id_field]
-                        topic_score = get_topic_score(search_topics, sentence_info.payload['topics'])
+                        topic_score = self.topics.get_topic_score(search_topics, sentence_info.payload['topics'])
 
                         document_indexes["{}:{}".format(document_id, sentence)] = int(sentence_info.payload['order'])
 
@@ -177,15 +162,20 @@ class BaseModelSummarizer(object):
                     document_scores[document_id] = (
                         (document_score / total_sentences) # 0 - 1
                         * (len(document_sentences[document_id]) / total_sentences) # 0 - 1
-                        * document_topic_scores.get(document_id, 1) # >= 1
+                        * document_topic_scores[document_id] # >= 1
                     )
 
             if documents:
+                document_score_mean = statistics.mean(list(document_scores.values()))
+
                 for document_id, score in sorted(document_scores.items(), key = lambda x:x[1], reverse = True):
+                    if score < document_score_mean:
+                        break
+
                     document = documents[document_id]
                     completed = False
 
-                    if document_sentences[document_id] and (not self.document_group_field or getattr(document, self.document_group_field) not in document_index):
+                    if document_sentences[document_id]:
                         for section_index, section in enumerate(self.parse_sections(document, document_sentences[document_id], document_indexes)):
                             if len(chunks) < max_chunks:
                                 chunks.append({
@@ -201,9 +191,6 @@ class BaseModelSummarizer(object):
                             'document': document,
                             'score': score
                         }
-                        if self.document_group_field:
-                            document_index[getattr(document, self.document_group_field)] = True
-
                         if completed:
                             break
 
@@ -274,8 +261,21 @@ class BaseModelSummarizer(object):
                 if previous_index:
                     sections.append("\n".join(section))
 
-                section = [ "The following is an excerpt from document '{}' to be used for summarization and answering questions:\n\n".format(
-                    getattr(document, self.document_group_field)),
+                if document.description:
+                    document_intro = "The following is an excerpt from {} '{}' with the following description: {}.\n\n".format(
+                        document.type,
+                        document.name,
+                        document.description.strip('.!?')
+                    )
+                else:
+                    document_intro = "The following is an excerpt from {} '{}'.\n\n".format(
+                        document.type,
+                        document.name
+                    )
+
+                section = [
+                    document_intro,
+                    "Use this excerpt exclusively for summarization and answering questions:\n\n",
                     sentence
                 ]
             else:
