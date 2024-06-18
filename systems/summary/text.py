@@ -7,9 +7,10 @@ import time
 
 class TextSummarizer(object):
 
-    def __init__(self, command, text, provider = None):
+    def __init__(self, command, text, provider = None, no_info_message = None):
         self.command = command
-        self.text = text.strip()
+        self.text = text.strip() if text else text
+        self.no_info_message = no_info_message if no_info_message else 'No information was found'
 
         self.provider = provider
         self.summarizer = self.command.get_summarizer(init = False, provider = self.provider)
@@ -128,7 +129,14 @@ Response Tokens: {}
             return _summary_text.strip(), _request_tokens, _response_tokens
 
         start_time = time.time()
-        summary_text, request_tokens, response_tokens = summarize(self.text)
+
+        if self.text is not None:
+            summary_text, request_tokens, response_tokens = summarize(self.text)
+        else:
+            summary_text = self.no_info_message
+            request_tokens = 0
+            response_tokens = 0
+
         token_count = (request_tokens + response_tokens)
 
         return Collection(
