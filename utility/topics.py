@@ -57,7 +57,7 @@ class TopicModel(object):
     def get_index(self, *texts):
         index = {}
         for text in texts:
-            for topic in self.parse(text.strip()):
+            for topic in self.parse(str(text).strip()):
                 if topic not in index:
                     index[topic] = 1
                 else:

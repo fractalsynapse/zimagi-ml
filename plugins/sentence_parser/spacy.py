@@ -63,7 +63,7 @@ class Provider(BaseProvider('sentence_parser', 'spacy')):
                             if noun_count > 0 and verb_count > 0:
                                 sentence = re.sub(r'\n+', ' ', str(sentence)).strip()
                                 if len(sentence) < self.get_max_sentence_length():
-                                    sentences.append(sentence)
+                                    sentences.append(str(sentence))
                     else:
                         sentences.append(str(sentence))
             return sentences
