@@ -368,7 +368,7 @@ If there is no directly relevant information in the provided text include the ph
                         if _chunk.result['text']:
                             _chunk_text[_chunk.result['index']] = _chunk.result['text']
                         else:
-                            _documents.pop(_chunk.result['id'])
+                            _documents.pop(_chunk.result['id'], None)
 
                     _summary_text, _final_request_tokens, _final_response_tokens, _chunk_documents = summarize(
                         "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
