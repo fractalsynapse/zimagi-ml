@@ -223,22 +223,26 @@ class BaseModelSummarizer(object):
             # Find relevant before
             for before_index in range((sentence_index - 1), -1, -1):
                 previous_sentence = document.sentences[before_index]
-                previous_tokens = self.summarizer.get_token_count(previous_sentence)
-                if (before_tokens + previous_tokens) > max_period_tokens:
-                    break
-                before_context.append(previous_sentence)
-                before_tokens += previous_tokens
-                sentence_map[before_index] = previous_sentence
+                if previous_sentence:
+                    previous_sentence = str(previous_sentence)
+                    previous_tokens = self.summarizer.get_token_count(previous_sentence)
+                    if (before_tokens + previous_tokens) > max_period_tokens:
+                        break
+                    before_context.append(previous_sentence)
+                    before_tokens += previous_tokens
+                    sentence_map[before_index] = previous_sentence
 
             # Find relevant after
             for after_index in range((sentence_index + 1), len(document.sentences)):
                 next_sentence = document.sentences[after_index]
-                next_tokens = self.summarizer.get_token_count(next_sentence)
-                if (after_tokens + next_tokens) > max_period_tokens:
-                    break
-                after_context.append(next_sentence)
-                after_tokens += next_tokens
-                sentence_map[after_index] = next_sentence
+                if next_sentence:
+                    next_sentence = str(next_sentence)
+                    next_tokens = self.summarizer.get_token_count(next_sentence)
+                    if (after_tokens + next_tokens) > max_period_tokens:
+                        break
+                    after_context.append(next_sentence)
+                    after_tokens += next_tokens
+                    sentence_map[after_index] = next_sentence
 
             # Find similarity around context
             # if self.command.debug:
