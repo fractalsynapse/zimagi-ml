@@ -14,7 +14,6 @@ class Provider(BaseProvider('encoder', 'transformer')):
             cls._transformer = {}
 
         if init and instance.identifier not in cls._transformer:
-            os.environ['TRANSFORMERS_CACHE'] = settings.MANAGER.tr_model_cache
             os.environ['HF_HOME'] = settings.MANAGER.hf_cache
 
             cls._transformer[instance.identifier] = cls._get_transformer(instance)
@@ -30,7 +29,7 @@ class Provider(BaseProvider('encoder', 'transformer')):
         return SentenceTransformer(cls._get_model_name(),
             cache_folder = settings.MANAGER.st_model_cache,
             device = instance.field_device,
-            use_auth_token = settings.HUGGINGFACE_TOKEN
+            token = settings.HUGGINGFACE_TOKEN
         )
 
     def _get_identifier(self, init):

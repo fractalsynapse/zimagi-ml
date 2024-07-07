@@ -16,7 +16,6 @@ class Provider(BaseProvider('summarizer', 'transformer')):
             cls._pipeline = {}
 
         if instance.identifier not in cls._pipeline:
-            os.environ['TRANSFORMERS_CACHE'] = settings.MANAGER.tr_model_cache
             os.environ['HF_HOME'] = settings.MANAGER.hf_cache
 
             cls._tokenizer[instance.identifier] = cls._get_tokenizer(instance)
@@ -34,7 +33,7 @@ class Provider(BaseProvider('summarizer', 'transformer')):
         from transformers import AutoTokenizer
         return AutoTokenizer.from_pretrained(
             cls._get_model_name(),
-            use_auth_token = settings.HUGGINGFACE_TOKEN
+            token = settings.HUGGINGFACE_TOKEN
         )
 
     @classmethod
