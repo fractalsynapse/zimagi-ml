@@ -315,6 +315,8 @@ class BaseModelSummarizer(object):
 
 
     def generate(self, prompt, search_prompt = None, user_prompt = None, output_format = '', output_endings = None, max_chunks = 10, include_files = True, sentence_limit = 50, **config):
+        max_token_count = self.summarizer.get_chunk_length()
+
         if output_endings is None:
             output_endings = [ '.', '?', '!' ]
 
@@ -385,12 +387,17 @@ Response Tokens: {}
                 if len(_chunks) > 1:
                     _results = self.command.run_list(_chunks, generate_summary)
                     _chunk_text = {}
+                    _chunk_tokens = 0
+
                     for _chunk in _results.data:
                         _request_tokens += _chunk.result['request_tokens']
                         _response_tokens += _chunk.result['response_tokens']
 
                         if _chunk.result['text']:
-                            _chunk_text[_chunk.result['index']] = _chunk.result['text']
+                            _text_tokens = self.summarizer.get_token_count(_chunk.result['text'])
+                            if (_chunk_tokens + _text_tokens) <= max_token_count:
+                                _chunk_text[_chunk.result['index']] = _chunk.result['text']
+                                _chunk_tokens += _text_tokens
                         else:
                             if self.command.debug:
                                 self.command.data('Removing Document', _chunk.result)
