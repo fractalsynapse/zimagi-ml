@@ -106,72 +106,92 @@ class BaseModelSummarizer(object):
             document_results = self.document_facade.filter(**{
                 self.document_id_field: self.instance.id
             })
+
+            if self.command.debug:
+                self.command.notice('Chunking documents')
+                self.command.data('Document ID Field', self.document_id_field)
+                self.command.data('Document Instance ID', self.instance.id)
+                self.command.data('Document Results', document_results)
+                self.command.data('Search Topics', search_topics)
+
             for document in document_results:
                 topic_score = self.topics.get_topic_score(search_topics, document.topics)
+
+                if self.command.debug:
+                    self.command.info("Document: {} ({})".format(document.id, document.name))
+                    self.command.data('Document Topics', document.topics)
+                    self.command.data('Document Topic Score', topic_score)
 
                 if document.description:
                     description_topics = self.topics.parse(document.description)
                     topic_score += self.topics.get_topic_score(search_topics, description_topics)
 
+                    if self.command.debug:
+                        self.command.data('Description Topics', description_topics)
+                        self.command.data('Document Updated Topic Score', topic_score)
+
                 if topic_score:
                     document_topic_scores[document.id] = topic_score
 
-            if document_topic_scores:
-                search = self.command.generate_text_embeddings(search_prompt, validate = False)
-                document_rankings = self.command.search_embeddings(self.embedding_collection,
-                    search.embeddings,
-                    limit = sentence_limit,
-                    fields = [ 'order', 'topics' ],
-                    filter_field = self.embedding_id_field,
-                    filter_ids = list(document_topic_scores.keys()),
-                    min_score = min_score
-                )
-                for index, ranking in enumerate(document_rankings):
-                    for ranking_index, sentence_info in enumerate(ranking):
-                        sentence = sentence_info.payload['sentence'].strip()
-                        document_id = sentence_info.payload[self.embedding_id_field]
-                        topic_score = self.topics.get_topic_score(search_topics, sentence_info.payload['topics'])
+            if self.command.debug:
+                self.command.data('Document Topic Scores', document_topic_scores)
 
-                        document_indexes["{}:{}".format(document_id, sentence)] = int(sentence_info.payload['order'])
+            search = self.command.generate_text_embeddings(search_prompt, validate = False)
+            document_rankings = self.command.search_embeddings(self.embedding_collection,
+                search.embeddings,
+                limit = sentence_limit,
+                fields = [ 'order', 'topics' ],
+                filter_field = self.embedding_id_field,
+                filter_ids = list(document_topic_scores.keys()),
+                min_score = min_score
+            )
+            for index, ranking in enumerate(document_rankings):
+                for ranking_index, sentence_info in enumerate(ranking):
+                    sentence = sentence_info.payload['sentence'].strip()
+                    document_id = sentence_info.payload[self.embedding_id_field]
+                    topic_score = self.topics.get_topic_score(search_topics, sentence_info.payload['topics'])
 
-                        if document_id not in document_scores:
-                            if document_id not in document_failed:
-                                document_results = self.document_facade.filter(**{
-                                    'id': document_id,
-                                    **self.document_filters
-                                })
-                                if document_results:
-                                    document = document_results[0]
-                                    documents[document_id] = document
-                                    document_scores[document_id] = (sentence_info.score * (1 + topic_score))
+                    document_indexes["{}:{}".format(document_id, sentence)] = int(sentence_info.payload['order'])
 
-                                    if document_id not in document_sentences:
-                                        document_sentences[document_id] = [ sentence ]
-                                    else:
-                                        document_sentences[document_id].append(sentence)
+                    if self.command.debug:
+                        self.command.data("Found Sentence ({})".format(sentence_info.score), sentence)
 
-                                    total_sentences += 1
+                    if document_id not in document_scores:
+                        if document_id not in document_failed:
+                            document_results = self.document_facade.filter(**{
+                                'id': document_id,
+                                **self.document_filters
+                            })
+                            if document_results:
+                                document = document_results[0]
+                                documents[document_id] = document
+                                document_scores[document_id] = (sentence_info.score * (1 + topic_score))
+
+                                if document_id not in document_sentences:
+                                    document_sentences[document_id] = [ sentence ]
                                 else:
-                                    document_failed[document_id] = True
-                        else:
-                            document_scores[document_id] += (sentence_info.score * (1 + topic_score))
-                            document_sentences[document_id].append(sentence)
-                            total_sentences += 1
+                                    document_sentences[document_id].append(sentence)
 
-                for document_id, document_score in document_scores.items():
-                    document_scores[document_id] = (
-                        (document_score / total_sentences) # 0 - 1
-                        * (len(document_sentences[document_id]) / total_sentences) # 0 - 1
-                        * document_topic_scores[document_id] # >= 1
-                    )
+                                total_sentences += 1
+                            else:
+                                document_failed[document_id] = True
+                    else:
+                        document_scores[document_id] += (sentence_info.score * (1 + topic_score))
+                        document_sentences[document_id].append(sentence)
+                        total_sentences += 1
+
+            for document_id, document_score in document_scores.items():
+                document_scores[document_id] = (
+                    (document_score / total_sentences) # 0 - 1
+                    * (len(document_sentences[document_id]) / total_sentences) # 0 - 1
+                    * (document_topic_scores.get(document_id, 0) + 1) # >= 0
+                )
+
+            if self.command.debug:
+                self.command.data('Document Scores', document_scores)
 
             if documents:
-                document_score_mean = statistics.mean(list(document_scores.values()))
-
                 for document_id, score in sorted(document_scores.items(), key = lambda x:x[1], reverse = True):
-                    if score < document_score_mean:
-                        break
-
                     document = documents[document_id]
                     completed = False
 
@@ -245,14 +265,14 @@ class BaseModelSummarizer(object):
                     sentence_map[after_index] = next_sentence
 
             # Find similarity around context
-            # if self.command.debug:
-            #     self.command.info('=' * self.command.display_width)
-            #     self.command.info('')
-            #     self.command.info('-------------------------------')
-            #     self.command.info('Sentence')
-            #     self.command.info('-------------------------------')
-            #     self.command.notice("{} ( {} )".format(sentence, sentence_index))
-            #     self.command.notice("Tokens: {} / {}".format(before_tokens, after_tokens))
+            if self.command.debug:
+                self.command.info('=' * self.command.display_width)
+                self.command.info('')
+                self.command.info('-------------------------------')
+                self.command.info('Sentence')
+                self.command.info('-------------------------------')
+                self.command.notice("{} ( {} )".format(sentence, sentence_index))
+                self.command.notice("Tokens: {} / {}".format(before_tokens, after_tokens))
 
         previous_index = None
         section = []
@@ -303,7 +323,7 @@ class BaseModelSummarizer(object):
             _sub_prompt = """
 Extract only the relevant information from the provided text for the following request: {}
 
-If there is no directly relevant information in the provided text include the phrase "No information available".
+If there is no directly relevant information in the provided text start the response with the phrase "No information available".
 """.format(prompt)
 
             _summary_text, _request_tokens, _response_tokens = self.command.generate_summary(
@@ -312,23 +332,23 @@ If there is no directly relevant information in the provided text include the ph
                 provider = self.provider,
                 **config
             )
-#             if self.command.debug:
-#                 self.command.notice(
-# """
-# ================================
-# {}
-# ................................
-# Request Tokens: {}
-# Response Tokens: {}
-# """.format(
-#                     _summary_text,
-#                     _request_tokens,
-#                     _response_tokens
-#                 ))
+            if self.command.debug:
+                self.command.notice(
+"""
+================================
+{}
+................................
+Request Tokens: {}
+Response Tokens: {}
+""".format(
+                    _summary_text,
+                    _request_tokens,
+                    _response_tokens
+                ))
 
             summary_text = _summary_text.strip()
-            if not re.search(r'No information[a-z\s]+available', summary_text):
-                summary_text = ''
+            if not re.search(r'^No information[a-z\s]+available', summary_text):
+               summary_text = ''
 
             return {
                 'index': info['index'],
@@ -342,7 +362,7 @@ If there is no directly relevant information in the provided text include the ph
         def summarize(text = None):
             _summary_text = ''
 
-            if text:
+            if text is not None:
                 _chunks = self._get_text_chunks(text, prompt, max_chunks)
                 _documents = {}
             else:
@@ -352,6 +372,10 @@ If there is no directly relevant information in the provided text include the ph
                     include_files = include_files,
                     sentence_limit = sentence_limit
                 )
+
+            if self.command.debug:
+                self.command.data('Summary Chunks', _chunks)
+                self.command.data('Summary Documents', _documents)
 
             _chunks = [ { 'index': _index, 'chunk': _chunk } for _index, _chunk in enumerate(_chunks) ]
             _request_tokens = 0
@@ -368,10 +392,18 @@ If there is no directly relevant information in the provided text include the ph
                         if _chunk.result['text']:
                             _chunk_text[_chunk.result['index']] = _chunk.result['text']
                         else:
+                            if self.command.debug:
+                                self.command.data('Removing Document', _chunk.result)
+
                             _documents.pop(_chunk.result['id'], None)
 
+                    _summary_input_text = "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
+
+                    if self.command.debug:
+                        self.command.data('Summary Input Text', _summary_input_text)
+
                     _summary_text, _final_request_tokens, _final_response_tokens, _chunk_documents = summarize(
-                        "\n\n".join([ _chunk_text[_index] for _index in sorted(_chunk_text.keys()) ])
+                        _summary_input_text
                     )
                     _request_tokens += _final_request_tokens
                     _response_tokens += _final_response_tokens
@@ -388,19 +420,19 @@ If there is no directly relevant information in the provided text include the ph
                     _request_tokens += _sub_request_tokens
                     _response_tokens += _sub_response_tokens
 
-#                     if self.command.debug:
-#                         self.command.notice(
-# """
-# **================================**
-# {}
-# **................................**
-# Request Tokens: {}
-# Response Tokens: {}
-# """.format(
-#                             _summary_text,
-#                             _request_tokens,
-#                             _response_tokens
-#                         ))
+                    if self.command.debug:
+                        self.command.notice(
+"""
+**================================**
+{}
+**................................**
+Request Tokens: {}
+Response Tokens: {}
+""".format(
+                            _summary_text,
+                            _request_tokens,
+                            _response_tokens
+                        ))
 
             return _summary_text.strip(), _request_tokens, _response_tokens, _documents
 
