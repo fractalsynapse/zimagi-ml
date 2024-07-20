@@ -183,7 +183,7 @@ class BaseModelSummarizer(object):
 
                 for document_id, document_score in document_scores.items():
                     document_scores[document_id] = (
-                        (document_score / total_sentences) # 0 - 1
+                        document_score # >= 0
                         * (len(document_sentences[document_id]) / total_sentences) # 0 - 1
                         * (document_topic_scores.get(document_id, 0) + 1) # >= 0
                     )
