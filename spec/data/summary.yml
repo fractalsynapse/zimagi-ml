@@ -52,7 +52,14 @@ data:
       - data-auditor
     fields:
       name: null
-      persona:
+      prompt:
+        type: '@django.TextField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          system: false
+      format:
         type: '@django.TextField'
         options:
           'null': true
@@ -65,11 +72,26 @@ data:
         options:
           editable: true
           system: false
-      prompt:
-        type: '@django.TextField'
+      cost:
+        type: '@django.FloatField'
         options:
           'null': true
           default: null
+          editable: true
+          primary_key: false
+          system: false
+      response_tokens:
+        type: '@django.IntegerField'
+        options:
+          'null': true
+          default: null
+          editable: true
+          primary_key: false
+          system: false
+      text:
+        type: '@zimagi.ListField'
+        color: json
+        options:
           editable: true
           system: false
       endings:
@@ -78,14 +100,15 @@ data:
         options:
           editable: true
           system: false
-      format:
-        type: '@django.TextField'
+      request_tokens:
+        type: '@django.IntegerField'
         options:
           'null': true
           default: null
           editable: true
+          primary_key: false
           system: false
-      text:
+      persona:
         type: '@django.TextField'
         options:
           'null': true

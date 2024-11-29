@@ -1,17 +1,58 @@
+command_mixins:
+    summary_agent:
+        class: SummaryAgentCommandMixin
+        mixins: [ml]
+        parameters:
+            model_provider:
+                parser: variable
+                type: str
+                optional: false
+                help: "AI model provider"
+                value_label: PROVIDER
+                tags: [ml]
+
+command_base:
+    sentence_parser_agent:
+        base: agent
+        mixins: [ml]
+        groups_allowed: [ml-user]
+        worker_type: ml-sentences
+
+    encoder_agent:
+        base: agent
+        mixins: [ml]
+        groups_allowed: [ml-user]
+        worker_type: ml-embedding
+
+    summary_agent:
+        base: agent
+        mixins: [summary_agent]
+        groups_allowed: [ml-user]
+        worker_type: ml-summary
+        parse:
+            - model_provider
+
 command:
     agent:
         model:
             sentence_parser:
-                base: agent
-                mixins: [ml]
-                worker_type: ml-sentences
+                base: sentence_parser_agent
 
             encoder:
-                base: agent
-                mixins: [ml]
-                worker_type: ml-embedding
+                base: encoder_agent
 
             summarizer:
-                base: agent
-                mixins: [ml]
-                worker_type: ml-summary
+                mixtral_7bx8:
+                    base: summary_agent
+                    options:
+                        model_provider: "mixtral_7bx8"
+
+                mixtral_22bx8:
+                    base: summary_agent
+                    options:
+                        model_provider: "mixtral_22bx8"
+
+                llama3_70b:
+                    base: summary_agent
+                    options:
+                        model_provider: "llama3_70b"

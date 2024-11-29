@@ -5,7 +5,7 @@ from systems.summary.text import TextSummarizer
 class Text(Command('model.summarize.text')):
 
     def exec(self):
-        summary = TextSummarizer(self, self.text).generate(
+        summary = TextSummarizer(self, self.text, provider = 'mixtral_di_7bx8').generate(
             max_chunks = self.max_chunks,
             persona = self.persona.strip(),
             prompt = self.instruction.strip(),

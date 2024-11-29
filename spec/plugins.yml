@@ -95,37 +95,20 @@ plugin:
         providers:
             transformer:
 
-            llama:
-                base: transformer
-                mixins: [llama_summary]
-            llama2_7b:
-                base: llama
-            llama2_13b:
-                base: llama
-
             di:
                 base: transformer
 
-            llama2_di:
-                base: di
-                mixins: [llama_summary]
-            llama2_di_7b:
-                base: llama2_di
-            llama2_di_13b:
-                base: llama2_di
-            llama2_di_70b:
-                base: llama2_di
-
-            llama3_di:
-                base: di
-                mixins: [llama_summary]
             llama3_di_70b:
-                base: llama3_di
-
-            mixtral_di:
                 base: di
-                mixins: [mixtral_summary]
+            llama3_70b:
+                base: llama3_di_70b
+
             mixtral_di_7bx8:
-                base: mixtral_di
+                base: di
+            mixtral_7bx8:
+                base: mixtral_di_7bx8
+
             mixtral_di_22bx8:
-                base: mixtral_di
+                base: di
+            mixtral_22bx8:
+                base: mixtral_di_22bx8

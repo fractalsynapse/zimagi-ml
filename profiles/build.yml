@@ -16,7 +16,8 @@ models:
         priority: 65
         fields:
             text:
-                type: text
+                type: list
+
             prompt:
                 type: text
             persona:
@@ -27,5 +28,13 @@ models:
                 type: list
             config:
                 type: dict
+
             result:
                 type: text
+
+            request_tokens:
+                type: integer
+            response_tokens:
+                type: integer
+            cost:
+                type: float

@@ -2,7 +2,6 @@ from django.conf import settings
 
 from systems.commands.index import CommandMixin
 from utility.data import Collection, get_identifier, dump_json, ensure_list
-from utility.web import WebParser
 
 import billiard as multiprocessing
 import re
@@ -125,12 +124,12 @@ class MLCommandMixin(CommandMixin('ml')):
         summary_channel = "agent:model:{}".format(summary_provider if summary_provider else 'summary')
         summary_persona = config.get('persona', '')
         summary_prompt = config.get('prompt', '')
-        summary_format = config.get('format', '')
-        summary_retries = config.get('retries', 5)
+        summary_format = config.get('output_format', '')
         summary_endings = ensure_list(config.get('endings', [ '.', '?', '!' ]))
+        summary_retries = config.get('retries', 5)
         summary_config = {
             key: value for key, value in config.items()
-            if key not in [ 'persona', 'prompt', 'format', 'retries', 'endings' ]
+            if key not in [ 'persona', 'prompt', 'output_format', 'retries', 'endings' ]
         }
         summary_id = get_identifier([
             text, summary_prompt, summary_persona, summary_format, summary_config
@@ -138,7 +137,7 @@ class MLCommandMixin(CommandMixin('ml')):
 
         def generate():
             summary = self._summary.get_or_create(summary_id)
-            summary.text = text
+            summary.text = ensure_list(text)
             summary.persona = summary_persona
             summary.prompt = summary_prompt
             summary.format = summary_format
@@ -147,6 +146,7 @@ class MLCommandMixin(CommandMixin('ml')):
 
             request_tokens = 0
             response_tokens = 0
+            processing_cost = 0
 
             if self.debug and self.verbosity == 3:
                 self.notice('Generating summary')
@@ -158,28 +158,37 @@ class MLCommandMixin(CommandMixin('ml')):
                 self.info('-' * self.display_width)
 
             for index in range(summary_retries):
-                request_tokens += 250 + summarizer.get_token_count(
-                    "\n\n\n".join([ text, summary_persona, summary_prompt, summary_format ])
-                )
                 result = self.submit(summary_channel, {
                     'text': text,
                     'config': config
-                }).strip()
+                })
+                request_tokens += result['prompt_tokens']
+                response_tokens += result['output_tokens']
+                processing_cost += result['cost']
 
-                response_tokens += summarizer.get_token_count(result)
-
-                if result and check_ending(result, summary_endings):
+                if result and check_ending(result['text'], summary_endings):
+                    response_text = result['text']
                     break
                 else:
-                    result = 'Summary generation was unsuccessful. Please retry with a modified question.'
+                    response_text = 'Summary generation was unsuccessful. Please retry with a modified question.'
 
             if self.debug and self.verbosity == 3:
                 self.info("\n")
-                self.info(result)
+                self.info(response_text)
 
-            summary.result = result
+            summary.result = response_text
+            summary.request_tokens = request_tokens
+            summary.response_tokens = response_tokens
+            summary.cost = processing_cost
             summary.save()
-            return result, request_tokens, response_tokens
+
+            return Collection(
+                text = response_text,
+                request_tokens = request_tokens,
+                response_tokens = response_tokens,
+                total_tokens = (request_tokens + response_tokens),
+                cost = processing_cost
+            )
 
         return self.run_exclusive("ml:{}:{}".format(summary_channel, summary_id), generate)
 
@@ -190,7 +199,7 @@ class MLCommandMixin(CommandMixin('ml')):
         summary_channel = "agent:model:{}".format(summary_key)
 
         def parse_model_summary(text, config):
-            return summarizer.summarize(text, **config)
+            return summarizer.summarize(text, **config).export()
 
         for package in self.listen(summary_channel, state_key = "model_{}".format(summary_key)):
             text = package.message['text']
@@ -208,8 +217,7 @@ class MLCommandMixin(CommandMixin('ml')):
             self.send("{}:stats".format(summary_channel), {
                 'provider': summarizer.name,
                 'time': response.time,
-                'memory': response.memory,
-                'length': len(text)
+                'memory': response.memory
             })
 
 
@@ -299,24 +307,17 @@ class MLCommandMixin(CommandMixin('ml')):
         sections = []
         section = ''
 
-        for chunk in re.split(r'\n\n+', text.strip()):
-            if chunk.strip():
-                combined_section = "{}\n{}".format(section, chunk).strip()
-                if len(combined_section) >= cutoff_section_len:
-                    sections.append(combined_section)
-                    section = ''
-                else:
-                    section = combined_section
+        for text_item in ensure_list(text):
+            for chunk in re.split(r'\n\n+', text_item.strip()):
+                if chunk.strip():
+                    combined_section = "{}\n{}".format(section, chunk).strip()
+                    if len(combined_section) >= cutoff_section_len:
+                        sections.append(combined_section)
+                        section = ''
+                    else:
+                        section = combined_section
 
         if section:
             sections.append(section)
 
         return sections
-
-
-    def parse_web_text(self, webpage_url):
-        text = ''
-        parser = WebParser(webpage_url)
-        if parser.text:
-            text = parser.text
-        return text
