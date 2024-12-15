@@ -8,6 +8,7 @@ from utility.runtime import Runtime
 import os
 import math
 import requests
+import re
 
 
 class DeepInfraRequestError(Exception):
@@ -34,11 +35,6 @@ class Provider(BaseProvider("summarizer", "di")):
             cls._get_model_name(), token=settings.HUGGINGFACE_TOKEN
         )
 
-    def get_chunk_length(self):
-        raise NotImplementedError(
-            "Method get_chunk_length() must be implemented in DeepInfra plugin providers."
-        )
-
     def get_max_new_tokens(self):
         raise NotImplementedError(
             "Method get_max_new_tokens() must be implemented in DeepInfra plugin providers."
@@ -49,7 +45,30 @@ class Provider(BaseProvider("summarizer", "di")):
         return True
 
     def _get_prompt(self, text="", prompt="", persona="", output_format=""):
+        max_context = self.get_max_context()
+        prompt_tokens = self.get_token_count(prompt)
+        sections = []
         messages = []
+        format_messages = []
+
+        if output_format:
+            format_instruction = "Render all responses according to the following output format instructions: {}".format(
+                output_format.strip()
+            )
+            format_response = "I will render all following responses according to the output format instructions provided."
+            format_messages = [
+                {
+                    "role": "user",
+                    "content": format_instruction,
+                },
+                {
+                    "role": "assistant",
+                    "content": format_response,
+                },
+            ]
+            prompt_tokens += self.get_token_count(
+                format_instruction
+            ) + self.get_token_count(format_response)
 
         if not persona:
             persona = "You always produce factually correct information from any information given and you do not ask questions."
@@ -57,65 +76,74 @@ class Provider(BaseProvider("summarizer", "di")):
         system_prompt = "Use the following description as a persona for all instructions and questions: {}".format(
             persona.strip()
         )
+        prompt_tokens += self.get_token_count(system_prompt)
 
         if self.implements_system_prompt():
             messages.append({"role": "system", "content": system_prompt})
         else:
+            system_response = "I will use the provided persona when responding to instructions and answering questions."
             messages.extend(
                 [
                     {"role": "user", "content": system_prompt},
                     {
                         "role": "assistant",
-                        "content": "I will use the provided persona when responding to instructions and answering questions.",
+                        "content": system_response,
                     },
                 ]
             )
+            prompt_tokens += self.get_token_count(system_response)
 
         if text:
-            for section in ensure_list(text):
+            for section in reversed(ensure_list(text)):
                 if isinstance(section, dict):
-                    messages.append(section)
+                    temp_prompt_tokens = self.get_token_count(section["content"])
+
+                    if (temp_prompt_tokens + prompt_tokens) > max_context:
+                        break
+                    else:
+                        sections.append(section)
+                        prompt_tokens += temp_prompt_tokens
                 else:
-                    messages.extend(
-                        [
-                            {
-                                "role": "user",
-                                "content": "Reference the following text passage for processing instructions and answering questions: {}".format(
-                                    section.strip()
-                                ),
-                            },
-                            {
-                                "role": "assistant",
-                                "content": "I will reference the provided information when given instructions and answering questions.",
-                            },
-                        ]
+                    section_prompt = "Reference the following text passage for processing instructions and answering questions: {}".format(
+                        section.strip()
                     )
+                    section_response = "I will reference the provided information when given instructions and answering questions."
+
+                    temp_prompt_tokens = self.get_token_count(
+                        section_prompt
+                    ) + self.get_token_count(section_response)
+
+                    if (temp_prompt_tokens + prompt_tokens) > max_context:
+                        break
+                    else:
+                        sections.extend(
+                            [
+                                {
+                                    "role": "user",
+                                    "content": section_prompt,
+                                },
+                                {
+                                    "role": "assistant",
+                                    "content": section_response,
+                                },
+                            ]
+                        )
+                        prompt_tokens += temp_prompt_tokens
+
+        messages.extend(reversed(sections))
 
         if output_format:
-            messages.extend(
-                [
-                    {
-                        "role": "user",
-                        "content": "Render all responses according to the following output format instructions: {}".format(
-                            output_format.strip()
-                        ),
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "I will render all following responses according to the output format instructions provided.",
-                    },
-                ]
-            )
+            messages.extend(format_messages)
 
         messages.append({"role": "user", "content": prompt})
         return messages
 
-    def get_prompt_token_count(self, text="", prompt="", persona="", output_format=""):
+    def get_prompt_token_count(self, prompt="", persona="", output_format=""):
         token_count = 0
         token_padding = 10
 
         for message in ensure_list(
-            self._get_prompt(text, prompt, persona, output_format)
+            self._get_prompt("", prompt, persona, output_format)
         ):
             if isinstance(message, dict):
                 token_count += self.get_token_count(message["content"]) + token_padding
@@ -152,6 +180,9 @@ class Provider(BaseProvider("summarizer", "di")):
         )
         if self.command.debug:
             self.command.data("DeepInfra {} prompt".format(model_name), messages)
+
+        if re.search(r"\s*(JSON|json)\s*", output_format):
+            config["response_format"] = {"type": "json_object"}
 
         results = self._run_inference(
             messages, max_tokens=self.get_max_new_tokens(), **config

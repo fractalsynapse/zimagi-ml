@@ -44,6 +44,11 @@ class BaseProvider(BasePlugin("summarizer")):
     def _get_identifier(self, init):
         return get_identifier(["1" if init else "0", self.name, self.field_device])
 
+    def get_max_context(self):
+        raise NotImplementedError(
+            "Class get_max_context method required by all subclasses"
+        )
+
     def get_chunk_length(self):
         raise NotImplementedError(
             "Class get_chunk_length method required by all subclasses"
@@ -57,12 +62,12 @@ class BaseProvider(BasePlugin("summarizer")):
     def _get_prompt(self, text="", prompt="", persona="", output_format=""):
         raise NotImplementedError("Class _get_prompt method required by all subclasses")
 
-    def get_prompt_token_count(self, text="", prompt="", persona="", output_format=""):
+    def get_prompt_token_count(self, prompt="", persona="", output_format=""):
         token_count = 0
         token_padding = 10
 
         for message in ensure_list(
-            self._get_prompt(text, prompt, persona, output_format)
+            self._get_prompt("", prompt, persona, output_format)
         ):
             token_count += self.get_token_count(message) + token_padding
 

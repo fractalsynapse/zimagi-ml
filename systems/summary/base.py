@@ -54,7 +54,7 @@ class BaseModelSummarizer(object):
     def _get_text_chunks(self, text, prompt, persona, output_format, max_chunks):
         max_token_count = self.summarizer.get_chunk_length()
         prompt_token_count = self.summarizer.get_prompt_token_count(
-            text=text, prompt=prompt, persona=persona, output_format=output_format
+            prompt, persona, output_format
         )
         token_count = prompt_token_count
 
@@ -87,6 +87,8 @@ class BaseModelSummarizer(object):
         max_chunks,
         search_prompt=None,
         user_prompt=None,
+        persona="",
+        output_format="",
         include_files=True,
         sentence_limit=50,
         min_score=0,
@@ -100,6 +102,10 @@ class BaseModelSummarizer(object):
 
         if not search_prompt:
             search_prompt = prompt
+
+        prompt_token_count = self.section_summarizer.get_prompt_token_count(
+            prompt, persona, output_format
+        )
 
         # Get text chunks
         if self.text_facade and self.text_field:
@@ -132,7 +138,7 @@ class BaseModelSummarizer(object):
                 **{self.document_id_field: self.instance.id}
             )
 
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.notice("Chunking documents")
                 self.command.data("Document ID Field", self.document_id_field)
                 self.command.data("Document Instance ID", self.instance.id)
@@ -144,7 +150,7 @@ class BaseModelSummarizer(object):
                     search_topics, document.topics
                 )
 
-                if self.command.debug:
+                if self.command.debug and self.command.verbosity > 2:
                     self.command.info(
                         "Document: {} ({})".format(document.id, document.name)
                     )
@@ -157,14 +163,14 @@ class BaseModelSummarizer(object):
                         search_topics, description_topics
                     )
 
-                    if self.command.debug:
+                    if self.command.debug and self.command.verbosity > 2:
                         self.command.data("Description Topics", description_topics)
                         self.command.data("Document Updated Topic Score", topic_score)
 
                 if topic_score:
                     document_topic_scores[document.id] = topic_score
 
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.data("Document Topic Scores", document_topic_scores)
 
             if document_topic_scores:
@@ -192,7 +198,7 @@ class BaseModelSummarizer(object):
                             sentence_info.payload["order"]
                         )
 
-                        if self.command.debug:
+                        if self.command.debug and self.command.verbosity > 2:
                             self.command.data(
                                 "Found Sentence ({})".format(sentence_info.score),
                                 sentence,
@@ -234,7 +240,7 @@ class BaseModelSummarizer(object):
                         * (document_topic_scores.get(document_id, 0) + 1)  # >= 0
                     )
 
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.data("Document Scores", document_scores)
 
             if documents:
@@ -250,6 +256,7 @@ class BaseModelSummarizer(object):
                                 document,
                                 document_sentences[document_id],
                                 document_indexes,
+                                prompt_token_count,
                             )
                         ):
                             if len(chunks) < max_chunks:
@@ -276,7 +283,10 @@ class BaseModelSummarizer(object):
 
         return chunks, ranked_documents
 
-    def parse_sections(self, document, sentences, indexes, max_section_tokens=3500):
+    def parse_sections(
+        self, document, sentences, indexes, prompt_token_count, max_section_tokens=3500
+    ):
+        max_token_count = self.section_summarizer.get_chunk_length()
         max_period_tokens = max_section_tokens / 2
         sentence_map = {}
         sections = []
@@ -330,7 +340,7 @@ class BaseModelSummarizer(object):
                     sentence_map[after_index] = next_sentence
 
             # Find similarity around context
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.info("=" * self.command.display_width)
                 self.command.info("")
                 self.command.info("-------------------------------")
@@ -343,11 +353,17 @@ class BaseModelSummarizer(object):
 
         previous_index = None
         section = []
+        token_count = prompt_token_count
 
         for sentence_index in sorted(sentence_map.keys()):
             sentence = sentence_map[sentence_index].strip()
+            sentence_tokens = self.section_summarizer.get_token_count(sentence)
 
-            if previous_index is None or ((sentence_index - previous_index) > 1):
+            if (
+                previous_index is None
+                or ((sentence_index - previous_index) > 1)
+                or (token_count + sentence_tokens > max_token_count)
+            ):
                 # New section
                 if previous_index:
                     sections.append("\n".join(section))
@@ -363,14 +379,23 @@ class BaseModelSummarizer(object):
                         )
                     )
 
+                section_instruction = "Use this excerpt exclusively for summarization and answering questions:\n\n"
+
+                token_count = (
+                    prompt_token_count
+                    + self.section_summarizer.get_token_count(document_intro)
+                    + self.section_summarizer.get_token_count(section_instruction)
+                    + self.section_summarizer.get_token_count(sentence)
+                )
                 section = [
                     document_intro,
-                    "Use this excerpt exclusively for summarization and answering questions:\n\n",
+                    section_instruction,
                     sentence,
                 ]
             else:
                 # Continue section
                 section.append(sentence)
+                token_count += sentence_tokens
 
             previous_index = sentence_index
 
@@ -408,7 +433,7 @@ return only the phrase: No information available.
 """.format(
                 prompt
             )
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.data(
                     "Prompt tokens",
                     self.section_summarizer.get_token_count(_sub_prompt),
@@ -420,7 +445,7 @@ return only the phrase: No information available.
             _summary = self.command.generate_summary(
                 chunk_text, prompt=_sub_prompt, provider=self.section_provider, **config
             )
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.notice(
                     """
 ================================
@@ -460,7 +485,7 @@ Summary Cost: ${}
                 )
                 _documents = {}
 
-                if self.command.debug:
+                if self.command.debug and self.command.verbosity > 2:
                     self.command.info("Text chunks:")
                     for chunk in _chunks:
                         self.command.data(
@@ -474,9 +499,11 @@ Summary Cost: ${}
                     user_prompt=user_prompt,
                     include_files=include_files,
                     sentence_limit=sentence_limit,
+                    persona=persona,
+                    output_format=output_format,
                 )
 
-            if self.command.debug:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.data("Summary Chunks", _chunks)
                 self.command.info("Summary Documents")
                 for document_id, info in _documents.items():
@@ -511,7 +538,7 @@ Summary Cost: ${}
                                 ]
                                 _chunk_tokens += _text_tokens
                         else:
-                            if self.command.debug:
+                            if self.command.debug and self.command.verbosity > 2:
                                 self.command.data("Removing Document", _chunk.result)
 
                             _documents.pop(_chunk.result["id"], None)
@@ -520,7 +547,7 @@ Summary Cost: ${}
                         [_chunk_text[_index] for _index in sorted(_chunk_text.keys())]
                     )
 
-                    if self.command.debug:
+                    if self.command.debug and self.command.verbosity > 2:
                         self.command.data("Summary Input Text", _summary_input_text)
 
                     (
@@ -549,7 +576,7 @@ Summary Cost: ${}
                     _response_tokens += _summary.response_tokens
                     _processing_cost += _summary.cost
 
-                    if self.command.debug:
+                    if self.command.debug and self.command.verbosity > 2:
                         self.command.notice(
                             """
 **================================**

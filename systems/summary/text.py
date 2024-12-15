@@ -22,7 +22,7 @@ class TextSummarizer(object):
     def _get_chunks(self, text, prompt, output_format="", persona=""):
         max_token_count = self.summarizer.get_chunk_length()
         prompt_token_count = self.summarizer.get_prompt_token_count(
-            text=text, prompt=prompt, persona=persona, output_format=output_format
+            prompt, persona, output_format
         )
         token_count = prompt_token_count
 
@@ -56,7 +56,7 @@ class TextSummarizer(object):
             _summary = self.command.generate_summary(
                 info["text"], prompt=prompt, provider=self.provider, **config
             )
-            if self.command.verbosity == 3:
+            if self.command.debug and self.command.verbosity > 2:
                 self.command.notice(
                     """
 ================================
@@ -139,7 +139,7 @@ Summary Cost: ${}
                     _response_tokens += _summary.response_tokens
                     _processing_cost += _summary.cost
 
-                    if self.command.verbosity == 3:
+                    if self.command.debug and self.command.verbosity > 2:
                         self.command.notice(
                             """
 **================================**
