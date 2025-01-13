@@ -19,7 +19,6 @@ class Info(Agent("model.info")):
                 response = self.profile(
                     self._get_model_info, model_provider, model_fields, config
                 )
-                print(response.result)
                 self.send(package.sender, response.result)
 
             except Exception as e:
