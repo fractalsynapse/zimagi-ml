@@ -13,18 +13,13 @@ class TextSummarizer(object):
         self.no_info_message = (
             no_info_message if no_info_message else "No information was found"
         )
-
         self.provider = provider
-        self.summarizer = self.command.get_summarizer(
-            init=False, provider=self.provider
-        )
 
     def _get_chunks(self, text, prompt, output_format="", persona=""):
-        max_token_count = self.summarizer.get_chunk_length()
-        prompt_token_count = self.summarizer.get_prompt_token_count(
-            prompt, persona, output_format
+        model_info = self.command.get_model_info(
+            self.provider, prompt, persona=persona, output_format=output_format
         )
-        token_count = prompt_token_count
+        token_count = model_info.prompt_tokens
 
         chunks = [""]
         chunk_index = 0
@@ -33,16 +28,17 @@ class TextSummarizer(object):
             for section_index, section in enumerate(
                 self.command.parse_text_sections(text)
             ):
-                tokens = self.summarizer.get_token_count(section)
-                if (token_count + tokens) > max_token_count:
-                    chunk_index += 1
-                    chunks.append(section)
-                    token_count = prompt_token_count + tokens
-                else:
-                    token_count += tokens
-                    chunks[chunk_index] = "{}\n\n{}".format(
-                        chunks[chunk_index], section
-                    )
+                tokens = self.command.get_token_count(self.provider, section)
+                if tokens:
+                    if (token_count + tokens[0]) > model_info.max_tokens:
+                        chunk_index += 1
+                        chunks.append(section)
+                        token_count = model_info.prompt_tokens + tokens[0]
+                    else:
+                        token_count += tokens[0]
+                        chunks[chunk_index] = "{}\n\n{}".format(
+                            chunks[chunk_index], section
+                        )
 
         return chunks
 

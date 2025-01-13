@@ -25,13 +25,7 @@ class BaseModelSummarizer(object):
         self.instance = instance
 
         self.provider = provider
-        self.summarizer = self.command.get_summarizer(
-            init=False, provider=self.provider
-        )
         self.section_provider = section_provider if section_provider else provider
-        self.section_summarizer = self.command.get_summarizer(
-            init=False, provider=self.section_provider
-        )
 
         self.topics = TopicModel()
 
@@ -52,11 +46,10 @@ class BaseModelSummarizer(object):
         self.embedding_id_field = self.instance.facade.pk
 
     def _get_text_chunks(self, text, prompt, persona, output_format, max_chunks):
-        max_token_count = self.summarizer.get_chunk_length()
-        prompt_token_count = self.summarizer.get_prompt_token_count(
-            prompt, persona, output_format
+        model_info = self.command.get_model_info(
+            self.provider, prompt, persona=persona, output_format=output_format
         )
-        token_count = prompt_token_count
+        token_count = model_info.prompt_tokens
 
         chunks = [""]
         chunk_index = 0
@@ -65,19 +58,20 @@ class BaseModelSummarizer(object):
             for section_index, section in enumerate(
                 self.command.parse_text_sections(text)
             ):
-                tokens = self.summarizer.get_token_count(section)
-                if (token_count + tokens) > max_token_count:
-                    chunk_index += 1
-                    if not max_chunks or chunk_index < max_chunks:
-                        chunks.append(section)
-                        token_count = prompt_token_count + tokens
+                tokens = self.command.get_token_count(self.provider, section)
+                if tokens:
+                    if (token_count + tokens[0]) > model_info.max_tokens:
+                        chunk_index += 1
+                        if not max_chunks or chunk_index < max_chunks:
+                            chunks.append(section)
+                            token_count = model_info.prompt_tokens + tokens[0]
+                        else:
+                            break
                     else:
-                        break
-                else:
-                    token_count += tokens
-                    chunks[chunk_index] = "{}\n\n{}".format(
-                        chunks[chunk_index], section
-                    )
+                        token_count += tokens[0]
+                        chunks[chunk_index] = "{}\n\n{}".format(
+                            chunks[chunk_index], section
+                        )
 
         return chunks
 
@@ -103,8 +97,8 @@ class BaseModelSummarizer(object):
         if not search_prompt:
             search_prompt = prompt
 
-        prompt_token_count = self.section_summarizer.get_prompt_token_count(
-            prompt, persona, output_format
+        model_info = self.command.get_model_info(
+            self.section_provider, prompt, persona=persona, output_format=output_format
         )
 
         # Get text chunks
@@ -256,7 +250,7 @@ class BaseModelSummarizer(object):
                                 document,
                                 document_sentences[document_id],
                                 document_indexes,
-                                prompt_token_count,
+                                model_info.prompt_tokens,
                             )
                         ):
                             if len(chunks) < max_chunks:
@@ -266,9 +260,12 @@ class BaseModelSummarizer(object):
                                     "id": document_id,
                                 }
                                 if self.command.debug:
-                                    section_info["tokens"] = (
-                                        self.section_summarizer.get_token_count(section)
+                                    tokens = self.command.get_token_count(
+                                        self.section_provider, section
                                     )
+                                    if tokens:
+                                        section_info["tokens"] = tokens[0]
+
                                 chunks.append(section_info)
                             else:
                                 completed = True
@@ -286,7 +283,7 @@ class BaseModelSummarizer(object):
     def parse_sections(
         self, document, sentences, indexes, prompt_token_count, max_section_tokens=3500
     ):
-        max_token_count = self.section_summarizer.get_chunk_length()
+        max_token_count = self.command.get_model_max_tokens(self.section_provider)
         max_period_tokens = max_section_tokens / 2
         sentence_map = {}
         sections = []
@@ -300,56 +297,63 @@ class BaseModelSummarizer(object):
             document.save()
 
         for sentence in set(sentences):
-            sentence_tokens = self.section_summarizer.get_token_count(sentence)
-            before_context = []
-            before_tokens = 0
-            after_context = []
-            after_tokens = 0
+            sentence_tokens = self.command.get_token_count(
+                self.section_provider, sentence
+            )
+            if sentence_tokens:
+                before_context = []
+                before_tokens = 0
+                after_context = []
+                after_tokens = 0
 
-            try:
-                sentence_index = indexes["{}:{}".format(document.id, sentence)]
-                sentence_map[sentence_index] = document.sentences[sentence_index]
+                try:
+                    sentence_index = indexes["{}:{}".format(document.id, sentence)]
+                    sentence_map[sentence_index] = document.sentences[sentence_index]
 
-            except ValueError as e:
-                continue
+                except ValueError as e:
+                    continue
 
-            # Find relevant before
-            for before_index in range((sentence_index - 1), -1, -1):
-                previous_sentence = document.sentences[before_index]
-                if previous_sentence:
-                    previous_sentence = str(previous_sentence)
-                    previous_tokens = self.section_summarizer.get_token_count(
-                        previous_sentence
+                # Find relevant before
+                for before_index in range((sentence_index - 1), -1, -1):
+                    previous_sentence = document.sentences[before_index]
+                    if previous_sentence:
+                        previous_sentence = str(previous_sentence)
+                        previous_tokens = self.command.get_token_count(
+                            self.section_provider, previous_sentence
+                        )
+                        if previous_tokens:
+                            if (before_tokens + previous_tokens[0]) > max_period_tokens:
+                                break
+                            before_context.append(previous_sentence)
+                            before_tokens += previous_tokens[0]
+                            sentence_map[before_index] = previous_sentence
+
+                # Find relevant after
+                for after_index in range((sentence_index + 1), len(document.sentences)):
+                    next_sentence = document.sentences[after_index]
+                    if next_sentence:
+                        next_sentence = str(next_sentence)
+                        next_tokens = self.command.get_token_count(
+                            self.section_provider, next_sentence
+                        )
+                        if next_tokens:
+                            if (after_tokens + next_tokens[0]) > max_period_tokens:
+                                break
+                            after_context.append(next_sentence)
+                            after_tokens += next_tokens[0]
+                            sentence_map[after_index] = next_sentence
+
+                # Find similarity around context
+                if self.command.debug and self.command.verbosity > 2:
+                    self.command.info("=" * self.command.display_width)
+                    self.command.info("")
+                    self.command.info("-------------------------------")
+                    self.command.info("Sentence")
+                    self.command.info("-------------------------------")
+                    self.command.notice("{} ( {} )".format(sentence, sentence_index))
+                    self.command.notice(
+                        "Tokens: {} / {}".format(before_tokens, after_tokens)
                     )
-                    if (before_tokens + previous_tokens) > max_period_tokens:
-                        break
-                    before_context.append(previous_sentence)
-                    before_tokens += previous_tokens
-                    sentence_map[before_index] = previous_sentence
-
-            # Find relevant after
-            for after_index in range((sentence_index + 1), len(document.sentences)):
-                next_sentence = document.sentences[after_index]
-                if next_sentence:
-                    next_sentence = str(next_sentence)
-                    next_tokens = self.section_summarizer.get_token_count(next_sentence)
-                    if (after_tokens + next_tokens) > max_period_tokens:
-                        break
-                    after_context.append(next_sentence)
-                    after_tokens += next_tokens
-                    sentence_map[after_index] = next_sentence
-
-            # Find similarity around context
-            if self.command.debug and self.command.verbosity > 2:
-                self.command.info("=" * self.command.display_width)
-                self.command.info("")
-                self.command.info("-------------------------------")
-                self.command.info("Sentence")
-                self.command.info("-------------------------------")
-                self.command.notice("{} ( {} )".format(sentence, sentence_index))
-                self.command.notice(
-                    "Tokens: {} / {}".format(before_tokens, after_tokens)
-                )
 
         previous_index = None
         section = []
@@ -357,47 +361,51 @@ class BaseModelSummarizer(object):
 
         for sentence_index in sorted(sentence_map.keys()):
             sentence = sentence_map[sentence_index].strip()
-            sentence_tokens = self.section_summarizer.get_token_count(sentence)
+            sentence_tokens = self.command.get_token_count(
+                self.section_provider, sentence
+            )
+            if sentence_tokens:
+                if (
+                    previous_index is None
+                    or ((sentence_index - previous_index) > 1)
+                    or (token_count + sentence_tokens[0] > max_token_count)
+                ):
+                    # New section
+                    if previous_index:
+                        sections.append("\n".join(section))
 
-            if (
-                previous_index is None
-                or ((sentence_index - previous_index) > 1)
-                or (token_count + sentence_tokens > max_token_count)
-            ):
-                # New section
-                if previous_index:
-                    sections.append("\n".join(section))
+                    if document.description:
+                        document_intro = "The following is an excerpt from {} '{}' with the following description: {}.\n\n".format(
+                            document.type,
+                            document.name,
+                            document.description.strip(".!?"),
+                        )
+                    else:
+                        document_intro = (
+                            "The following is an excerpt from {} '{}'.\n\n".format(
+                                document.type, document.name
+                            )
+                        )
 
-                if document.description:
-                    document_intro = "The following is an excerpt from {} '{}' with the following description: {}.\n\n".format(
-                        document.type, document.name, document.description.strip(".!?")
-                    )
-                else:
-                    document_intro = (
-                        "The following is an excerpt from {} '{}'.\n\n".format(
-                            document.type, document.name
+                    section_instruction = "Use this excerpt exclusively for summarization and answering questions:\n\n"
+
+                    token_count = prompt_token_count + sum(
+                        self.command.get_token_count(
+                            self.section_provider,
+                            [document_intro, section_instruction, sentence],
                         )
                     )
+                    section = [
+                        document_intro,
+                        section_instruction,
+                        sentence,
+                    ]
+                else:
+                    # Continue section
+                    section.append(sentence)
+                    token_count += sentence_tokens[0]
 
-                section_instruction = "Use this excerpt exclusively for summarization and answering questions:\n\n"
-
-                token_count = (
-                    prompt_token_count
-                    + self.section_summarizer.get_token_count(document_intro)
-                    + self.section_summarizer.get_token_count(section_instruction)
-                    + self.section_summarizer.get_token_count(sentence)
-                )
-                section = [
-                    document_intro,
-                    section_instruction,
-                    sentence,
-                ]
-            else:
-                # Continue section
-                section.append(sentence)
-                token_count += sentence_tokens
-
-            previous_index = sentence_index
+                previous_index = sentence_index
 
         if section:
             sections.append("\n".join(section))
@@ -416,7 +424,7 @@ class BaseModelSummarizer(object):
         sentence_limit=50,
         **config
     ):
-        max_token_count = self.summarizer.get_chunk_length()
+        max_token_count = self.command.get_model_max_tokens(self.provider)
         persona = config.get("persona", "")
 
         if output_endings is None:
@@ -434,12 +442,15 @@ return only the phrase: No information available.
                 prompt
             )
             if self.command.debug and self.command.verbosity > 2:
-                self.command.data(
-                    "Prompt tokens",
-                    self.section_summarizer.get_token_count(_sub_prompt),
+                token_counts = self.command.get_token_count(
+                    self.section_provider, [_sub_prompt, chunk_text]
                 )
                 self.command.data(
-                    "Chunk tokens", self.section_summarizer.get_token_count(chunk_text)
+                    "Prompt tokens",
+                    token_counts[0] if len(token_counts) > 0 else 0,
+                )
+                self.command.data(
+                    "Chunk tokens", token_counts[1] if len(token_counts) > 1 else 0
                 )
 
             _summary = self.command.generate_summary(
@@ -489,7 +500,8 @@ Summary Cost: ${}
                     self.command.info("Text chunks:")
                     for chunk in _chunks:
                         self.command.data(
-                            "Chunk Tokens", self.summarizer.get_token_count(chunk)
+                            "Chunk Tokens",
+                            sum(self.command.get_token_count(self.provider, chunk)),
                         )
             else:
                 _chunks, _documents = self._get_chunks(
@@ -529,14 +541,15 @@ Summary Cost: ${}
                         _processing_cost += _chunk.result["cost"]
 
                         if _chunk.result["text"]:
-                            _text_tokens = self.summarizer.get_token_count(
-                                _chunk.result["text"]
+                            _text_tokens = self.command.get_token_count(
+                                self.provider, _chunk.result["text"]
                             )
-                            if (_chunk_tokens + _text_tokens) <= max_token_count:
-                                _chunk_text[_chunk.result["index"]] = _chunk.result[
-                                    "text"
-                                ]
-                                _chunk_tokens += _text_tokens
+                            if _text_tokens:
+                                if (_chunk_tokens + _text_tokens[0]) <= max_token_count:
+                                    _chunk_text[_chunk.result["index"]] = _chunk.result[
+                                        "text"
+                                    ]
+                                    _chunk_tokens += _text_tokens[0]
                         else:
                             if self.command.debug and self.command.verbosity > 2:
                                 self.command.data("Removing Document", _chunk.result)
