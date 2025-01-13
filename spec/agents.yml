@@ -32,6 +32,12 @@ command_base:
         parse:
             - model_provider
 
+    model_info_agent:
+        base: agent
+        mixins: [summary_agent]
+        groups_allowed: [ml-user]
+        worker_type: ml-summary
+
 command:
     agent:
         model:
@@ -56,3 +62,6 @@ command:
                     base: summary_agent
                     options:
                         model_provider: "llama3_70b"
+
+            info:
+                base: model_info_agent
