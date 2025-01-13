@@ -116,6 +116,41 @@ class MLCommandMixin(CommandMixin("ml")):
 
         return provider
 
+    def get_model_max_tokens(self, provider):
+        tokens = self.submit(
+            "agent:model:info",
+            {
+                "model": provider,
+                "fields": "max_tokens",
+            },
+        )
+        return tokens["max_tokens"]
+
+    def get_model_info(self, provider, prompt, persona="", output_format=""):
+        return Collection(
+            **self.submit(
+                "agent:model:info",
+                {
+                    "model": provider,
+                    "fields": ["max_tokens", "prompt_tokens"],
+                    "config": {
+                        "prompt": prompt,
+                        "persona": persona,
+                        "format": output_format,
+                    },
+                },
+            )
+        )
+
+    def get_token_count(self, provider, texts):
+        if not texts:
+            return []
+        model_info = self.submit(
+            "agent:model:info",
+            {"model": provider, "fields": "token_count", "config": {"texts": texts}},
+        )
+        return model_info.get("token_count", [])
+
     def generate_summary(self, text, **config):
         summary_provider = config.get("provider", None)
         summarizer = self.get_summarizer(init=False, provider=summary_provider)
